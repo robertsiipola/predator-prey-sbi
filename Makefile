@@ -1,4 +1,6 @@
-.PHONY: format lint typecheck check simulate smoke infer
+.PHONY: format lint typecheck check simulate smoke infer diagnostics
+
+POSTERIOR ?= runs/2026-01-04_185353/posterior_samples.npz
 
 format:
 	ruff format .
@@ -22,3 +24,7 @@ smoke:
 infer:
 	mkdir -p .cache/matplotlib arviz_data
 	HOME=$(PWD) MPLCONFIGDIR=$(PWD)/.cache/matplotlib uv run --no-cache python -m predator_prey_sbi.infer --config configs/base.yaml --observed data/LynxHare.txt
+
+diagnostics:
+	mkdir -p .cache/matplotlib arviz_data
+	HOME=$(PWD) MPLCONFIGDIR=$(PWD)/.cache/matplotlib uv run --no-cache python -m predator_prey_sbi.diagnostics --config configs/base.yaml --observed data/LynxHare.txt --posterior $(POSTERIOR)
