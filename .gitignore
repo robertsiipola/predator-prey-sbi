@@ -203,6 +203,8 @@ cython_debug/
 
 # Ruff stuff:
 .ruff_cache/
+arviz_data/
+sbi-logs/
 
 # PyPI configuration file
 .pypirc
