@@ -12,7 +12,7 @@ The goal is to let a user infer predator-prey model parameters from the historic
 
 - [x] (2026-01-02 20:57Z) Read repository context, data file, and PLANS.md; drafted initial ExecPlan.
 - [x] (2026-01-02 21:01Z) Committed to neural SBI (sbi + torch) as the inference approach.
-- [ ] Set up neural SBI dependencies and run the smoke-test training script.
+- [x] (2026-01-04 17:35Z) Added torch/sbi dependencies and completed the neural SBI smoke test.
 - [x] (2026-01-03 06:31Z) Implemented data loading, Lotka-Volterra simulator, log-noise observation model, and simulation CLI/config.
 - [ ] Implement inference pipeline and diagnostics, then validate against the Lynx-Hare data.
 
@@ -22,6 +22,8 @@ The goal is to let a user infer predator-prey model parameters from the historic
   Evidence: main.py prints a greeting, and README.md has no content.
 - Observation: data/LynxHare.txt appears to be a three-column yearly time series without a header.
   Evidence: first lines show year followed by two numeric columns.
+- Observation: Importing sbi triggers arviz, which attempts to create Path.home()/arviz_data and fails in a sandboxed home directory.
+  Evidence: PermissionError when importing sbi before setting HOME to a writable path.
 
 ## Decision Log
 
@@ -34,6 +36,9 @@ The goal is to let a user infer predator-prey model parameters from the historic
 - Decision: Use hand-crafted summary statistics (for example, mean, variance, autocorrelation, peak counts, and lagged cross-correlation) as the inference inputs rather than a learned embedding network.
   Rationale: The user confirmed a summary-statistics approach for now; this reduces complexity and speeds iteration while still enabling neural posterior estimation.
   Date/Author: 2026-01-03, Codex
+- Decision: Set HOME and MPLCONFIGDIR to repo-local writable directories when running SBI tools to avoid arviz and matplotlib cache permission errors.
+  Rationale: sbi imports arviz, which writes to Path.home(); ensuring a writable HOME prevents failures in the sandboxed environment.
+  Date/Author: 2026-01-04, Codex
 - Decision: Assume the second column in data/LynxHare.txt is the prey (hare) series and the third column is the predator (lynx) series, with units treated as relative counts.
   Rationale: This is the common ordering for the lynx-hare dataset; the plan remains flexible if a different ordering is confirmed.
   Date/Author: 2026-01-02, Codex
@@ -185,3 +190,4 @@ The CLI entry point should be implemented by adding if __name__ == "__main__" bl
 Change Note: 2026-01-02 21:01Z — Updated the plan to commit to neural SBI only (sbi + torch), removed ABC references, added summary-statistics and neural posterior estimator interfaces, and introduced a neural SBI smoke-test step to align with the requested approach.
 Change Note: 2026-01-03 06:31Z — Recorded the decision to use hand-crafted summary statistics instead of learned embeddings for the neural SBI inputs.
 Change Note: 2026-01-03 06:31Z — Updated Progress to reflect completion of Milestone 1 implementation steps (data loader, simulator, CLI, config).
+Change Note: 2026-01-04 17:35Z — Marked Milestone 2 complete, documented arviz home-directory permission issue, and recorded the decision to set HOME/MPLCONFIGDIR for SBI commands.
