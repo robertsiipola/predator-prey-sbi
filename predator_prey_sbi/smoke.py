@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -10,17 +9,8 @@ import torch
 
 from predator_prey_sbi.data import load_lynx_hare
 from predator_prey_sbi.features import summarize_series
+from predator_prey_sbi.runtime import configure_runtime
 from predator_prey_sbi.simulator import simulate_lv
-
-
-def _configure_runtime() -> Path:
-    repo_root = Path(__file__).resolve().parents[1]
-    os.environ["HOME"] = str(repo_root)
-    mpl_dir = repo_root / ".cache" / "matplotlib"
-    mpl_dir.mkdir(parents=True, exist_ok=True)
-    os.environ.setdefault("MPLCONFIGDIR", str(mpl_dir))
-    (repo_root / "arviz_data").mkdir(parents=True, exist_ok=True)
-    return repo_root
 
 
 def _make_run_dir(base_dir: str) -> Path:
@@ -36,7 +26,7 @@ def run_smoke_test(
     num_samples: int,
     output_dir: str,
 ) -> Path:
-    _configure_runtime()
+    configure_runtime()
 
     if rng_seed is not None:
         torch.manual_seed(rng_seed)

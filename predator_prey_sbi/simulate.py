@@ -3,51 +3,12 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 import matplotlib.pyplot as plt
-import yaml
 
+from predator_prey_sbi.config import load_config
 from predator_prey_sbi.data import load_lynx_hare
 from predator_prey_sbi.simulator import simulate_lv
-
-
-DEFAULT_CONFIG: dict[str, Any] = {
-    "data_path": "data/LynxHare.txt",
-    "params": {
-        "alpha": 1.5,
-        "beta": 0.9,
-        "delta": 0.75,
-        "gamma": 1.3,
-    },
-    "noise_scale": 0.1,
-    "dt": 0.1,
-    "use_observed_initial": True,
-    "x0": [10.0, 10.0],
-    "plot": {
-        "show_observed": True,
-    },
-    "output_dir": "runs",
-}
-
-
-def _deep_update(base: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any]:
-    merged = dict(base)
-    for key, value in updates.items():
-        if isinstance(value, dict) and isinstance(merged.get(key), dict):
-            merged[key] = _deep_update(merged[key], value)
-        else:
-            merged[key] = value
-    return merged
-
-
-def _load_config(path: str) -> dict[str, Any]:
-    config_path = Path(path)
-    with config_path.open("r", encoding="utf-8") as handle:
-        loaded = yaml.safe_load(handle) or {}
-    if not isinstance(loaded, dict):
-        raise ValueError("Config must be a mapping")
-    return _deep_update(DEFAULT_CONFIG, loaded)
 
 
 def _make_run_dir(base_dir: str) -> Path:
@@ -94,7 +55,7 @@ def _plot_series(
 
 
 def run_simulation(config_path: str) -> Path:
-    config = _load_config(config_path)
+    config = load_config(config_path)
 
     data_path = str(config["data_path"])
     years, hare_obs, lynx_obs = load_lynx_hare(data_path)

@@ -25,3 +25,15 @@ plot:
   show_observed: true
 
 output_dir: runs
+
+inference:
+  num_simulations: 500
+  num_samples: 500
+  num_workers: 1
+  seed: 0
+  noise_scale: 0.0
+  prior:
+    alpha: [0.2, 3.0]
+    beta: [0.05, 1.5]
+    delta: [0.05, 1.5]
+    gamma: [0.2, 3.0]
