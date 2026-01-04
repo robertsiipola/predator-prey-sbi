@@ -34,6 +34,18 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "gamma": [0.2, 3.0],
         },
     },
+    "diagnostics": {
+        "posterior_draws": 200,
+        "seed": 0,
+        "noise_scale": 0.0,
+        "sbc": {
+            "num_simulations": 500,
+            "num_datasets": 20,
+            "num_posterior_samples": 200,
+            "num_workers": 1,
+            "seed": 0,
+        },
+    },
 }
 
 

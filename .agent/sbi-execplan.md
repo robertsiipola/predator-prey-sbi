@@ -15,6 +15,7 @@ The goal is to let a user infer predator-prey model parameters from the historic
 - [x] (2026-01-04 17:35Z) Added torch/sbi dependencies and completed the neural SBI smoke test.
 - [x] (2026-01-03 06:31Z) Implemented data loading, Lotka-Volterra simulator, log-noise observation model, and simulation CLI/config.
 - [x] (2026-01-04 18:53Z) Implemented neural SBI inference pipeline and ran it on Lynx-Hare data.
+- [x] (2026-01-04 19:02Z) Added diagnostics (posterior predictive + SBC) and validated with a full diagnostics run.
 
 ## Surprises & Discoveries
 
@@ -26,6 +27,8 @@ The goal is to let a user infer predator-prey model parameters from the historic
   Evidence: PermissionError when importing sbi before setting HOME to a writable path.
 - Observation: The inference pipeline completes with the default configuration in ~20 seconds for 500 simulations on this machine.
   Evidence: make infer produced a posterior_samples.npz after training 500 simulations.
+- Observation: Diagnostics completed with posterior predictive RMSE of ~49 (hare) and ~22 (lynx) and SBC coverage between 0.65 and 0.85 for default settings.
+  Evidence: diagnostics_metrics.json in runs/2026-01-04_190213.
 
 ## Decision Log
 
@@ -194,3 +197,4 @@ Change Note: 2026-01-03 06:31Z — Recorded the decision to use hand-crafted sum
 Change Note: 2026-01-03 06:31Z — Updated Progress to reflect completion of Milestone 1 implementation steps (data loader, simulator, CLI, config).
 Change Note: 2026-01-04 17:35Z — Marked Milestone 2 complete, documented arviz home-directory permission issue, and recorded the decision to set HOME/MPLCONFIGDIR for SBI commands.
 Change Note: 2026-01-04 18:53Z — Completed Milestone 3 by adding the inference pipeline, config wiring, and runtime helpers, and validated it with a successful inference run.
+Change Note: 2026-01-04 19:02Z — Implemented diagnostics, added SBC and posterior predictive checks, and validated with a full diagnostics run.

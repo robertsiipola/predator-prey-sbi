@@ -1,0 +1,14 @@
+{
+  "posterior_predictive_hare_rmse": 49.08889570069885,
+  "posterior_predictive_lynx_rmse": 22.63316992843208,
+  "posterior_predictive_plot": "runs/2026-01-04_190213/posterior_predictive.png",
+  "sbc_rank_histogram": "runs/2026-01-04_190213/sbc_rank_histogram.png",
+  "sbc_coverage": {
+    "alpha": 0.65,
+    "beta": 0.75,
+    "delta": 0.85,
+    "gamma": 0.8
+  },
+  "sbc_num_datasets": 20,
+  "sbc_num_posterior_samples": 200
+}
