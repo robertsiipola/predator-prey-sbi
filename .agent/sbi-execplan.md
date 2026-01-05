@@ -23,6 +23,8 @@ The goal is to let a user infer predator-prey model parameters from the historic
 - [x] (2026-01-05 12:55Z) Updated diagnostics loader to accept reparameterized posterior samples.
 - [x] (2026-01-05 14:55Z) Added inferred observation noise parameters (sigma_h, sigma_l) and updated simulator wiring/configs.
 - [x] (2026-01-05 14:55Z) Ran inference + diagnostics with inferred observation noise; recorded RMSE and SBC results.
+- [x] (2026-01-05 15:06Z) Added mechanistic regression summaries derived from log-growth vs. predator/prey levels.
+- [x] (2026-01-05 15:13Z) Ran inference + diagnostics with mechanistic regression summaries; recorded RMSE and SBC.
 
 ## Surprises & Discoveries
 
@@ -46,6 +48,10 @@ The goal is to let a user infer predator-prey model parameters from the historic
   Evidence: diagnostics_metrics.json in runs/2026-01-05_124403.
 - Observation: Inferring observation noise (sigma_h, sigma_l) kept hare RMSE similar while improving lynx RMSE slightly (hare ~35.3, lynx ~18.7).
   Evidence: diagnostics_metrics.json in runs/2026-01-05_145536.
+- Observation: Mechanistic regression summaries increased the summary length to include slope/intercept/R2 for log-growth regressions.
+  Evidence: summarize_series now appends six regression features.
+- Observation: Mechanistic regression summaries degraded RMSE versus the prior run (hare ~38.4, lynx ~20.2).
+  Evidence: diagnostics_metrics.json in runs/2026-01-05_151311.
 
 ## Decision Log
 
@@ -70,13 +76,16 @@ The goal is to let a user infer predator-prey model parameters from the historic
 - Decision: Infer observation noise (sigma_h, sigma_l) on the log scale instead of fixing noise_scale.
   Rationale: Allowing separate observation noise per series reduces pressure on dynamics parameters to explain variability.
   Date/Author: 2026-01-05, Codex
+- Decision: Add mechanistic regression summaries based on log-growth vs. predator/prey levels.
+  Rationale: These features directly target the LV structure and can improve identifiability without a learned embedding.
+  Date/Author: 2026-01-05, Codex
 - Decision: Assume the second column in data/LynxHare.txt is the prey (hare) series and the third column is the predator (lynx) series, with units treated as relative counts.
   Rationale: This is the common ordering for the lynx-hare dataset; the plan remains flexible if a different ordering is confirmed.
   Date/Author: 2026-01-02, Codex
 
 ## Outcomes & Retrospective
 
-Milestones 1–4 are implemented and verified with inference + diagnostics runs. Logistic prey growth (carrying capacity k) improved RMSE substantially versus the baseline. Adding inferred observation noise marginally improved lynx RMSE while keeping hare RMSE similar, suggesting additional gains may require richer summaries or larger simulation budgets.
+Milestones 1–4 are implemented and verified with inference + diagnostics runs. Logistic prey growth (carrying capacity k) improved RMSE substantially versus the baseline. Adding inferred observation noise marginally improved lynx RMSE while keeping hare RMSE similar, while the mechanistic regression summaries worsened RMSE in the first trial; further gains likely need alternative summaries or a larger simulation budget.
 
 ## Context and Orientation
 
@@ -231,3 +240,5 @@ Change Note: 2026-01-05 11:24Z — Added a decision to reparameterize LV using (
 Change Note: 2026-01-05 12:55Z — Recorded reparameterization experiment results, diagnostics loader fix, and updated progress/outcomes to reflect current state.
 Change Note: 2026-01-05 12:45Z — Added logistic prey growth with carrying capacity k and recorded the improved RMSE results.
 Change Note: 2026-01-05 14:55Z — Added inferred observation noise (sigma_h, sigma_l) and recorded the updated RMSE/SBC results.
+Change Note: 2026-01-05 15:06Z — Added mechanistic regression summaries to the feature set.
+Change Note: 2026-01-05 15:13Z — Recorded mechanistic summary experiment results (RMSE and SBC).

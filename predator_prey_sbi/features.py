@@ -25,6 +25,8 @@ def summarize_series(hare: Iterable[float], lynx: Iterable[float]) -> list[float
     lynx_period = _dominant_period(lynx_log)
     cross_corr = _corrcoef_safe(hare_log, lynx_log)
     cross_max_corr, cross_lag = _cross_corr_max_lag(hare_log, lynx_log, max_lag=10)
+    reg_hare = _mechanistic_regression(lynx_arr, hare_arr)
+    reg_lynx = _mechanistic_regression(hare_arr, lynx_arr)
 
     return [
         hare_stats[0],
@@ -42,6 +44,12 @@ def summarize_series(hare: Iterable[float], lynx: Iterable[float]) -> list[float
         cross_corr,
         cross_max_corr,
         cross_lag,
+        reg_hare[0],
+        reg_hare[1],
+        reg_hare[2],
+        reg_lynx[0],
+        reg_lynx[1],
+        reg_lynx[2],
     ]
 
 
@@ -122,3 +130,35 @@ def _cross_corr_max_lag(
             best_lag = lag
     lag_norm = float(best_lag) / float(x.size)
     return float(best_corr), lag_norm
+
+
+def _mechanistic_regression(
+    predictor: np.ndarray,
+    response_series: np.ndarray,
+) -> tuple[float, float, float]:
+    if predictor.size < 2 or response_series.size < 2:
+        return 0.0, 0.0, 0.0
+    pred_safe = np.clip(predictor, 1e-9, None)
+    resp_safe = np.clip(response_series, 1e-9, None)
+    growth = np.diff(np.log(resp_safe))
+    x = pred_safe[:-1]
+    return _linear_regression(x, growth)
+
+
+def _linear_regression(x: np.ndarray, y: np.ndarray) -> tuple[float, float, float]:
+    if x.size == 0 or y.size == 0 or x.size != y.size:
+        return 0.0, 0.0, 0.0
+    var_x = float(np.var(x))
+    if math.isclose(var_x, 0.0):
+        return 0.0, float(np.mean(y)), 0.0
+    cov_xy = float(np.mean((x - np.mean(x)) * (y - np.mean(y))))
+    slope = cov_xy / var_x
+    intercept = float(np.mean(y) - slope * np.mean(x))
+    y_hat = intercept + slope * x
+    ss_res = float(np.sum((y - y_hat) ** 2))
+    ss_tot = float(np.sum((y - np.mean(y)) ** 2))
+    if math.isclose(ss_tot, 0.0):
+        r2 = 0.0
+    else:
+        r2 = max(0.0, 1.0 - ss_res / ss_tot)
+    return float(slope), float(intercept), float(r2)
