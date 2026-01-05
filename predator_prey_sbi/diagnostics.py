@@ -18,6 +18,7 @@ from predator_prey_sbi.parameters import (
     resolve_lv_params,
     resolve_noise_scales,
 )
+from predator_prey_sbi.priors import build_structure_aware_prior
 from predator_prey_sbi.runtime import configure_runtime
 from predator_prey_sbi.types import PosteriorLike, PriorLike
 
@@ -34,13 +35,27 @@ def _load_posterior_samples(path: str) -> dict[str, np.ndarray]:
     samples = {key: data[key] for key in data.files}
     base_required = {"alpha", "beta", "delta", "gamma"}
     reparam_required = {"alpha", "gamma", "x_star", "y_star"}
-    if base_required.issubset(samples) or reparam_required.issubset(samples):
+    structure_required = {
+        "log_T",
+        "log_r",
+        "log_x_eq",
+        "log_y_eq",
+        "log_k_ratio",
+    }
+    if (
+        base_required.issubset(samples)
+        or reparam_required.issubset(samples)
+        or structure_required.issubset(samples)
+    ):
         return samples
     missing_base = sorted(base_required.difference(samples))
     missing_reparam = sorted(reparam_required.difference(samples))
+    missing_structure = sorted(structure_required.difference(samples))
     raise ValueError(
         "Posterior samples missing keys for either parameterization. "
-        f"Base missing: {missing_base}; reparam missing: {missing_reparam}"
+        "Base missing: {base}; reparam missing: {reparam}; structure missing: {structure}".format(
+            base=missing_base, reparam=missing_reparam, structure=missing_structure
+        )
     )
     return samples
 
@@ -276,19 +291,20 @@ def diagnostics_from_file(
     embedding_cfg = (
         inference_cfg.get("embedding", {}) if isinstance(inference_cfg, dict) else {}
     )
+    prior_scheme = str(inference_cfg.get("prior_scheme", "default"))
     parameter_order = list(
         inference_cfg.get(
             "parameter_order",
             [
-                "alpha",
-                "gamma",
-                "x_star",
-                "y_star",
-                "k",
-                "sigma_h",
-                "sigma_l",
+                "log_T",
+                "log_r",
+                "log_x_eq",
+                "log_y_eq",
+                "log_k_ratio",
                 "eps_h0",
                 "eps_l0",
+                "log_sigma_h",
+                "log_sigma_l",
             ],
         )
     )
@@ -301,6 +317,11 @@ def diagnostics_from_file(
         x0 = (float(x0_values[0]), float(x0_values[1]))
 
     dt = float(config.get("dt", 0.1))
+
+    if prior_scheme == "structure_aware":
+        parameter_order, prior_cfg = build_structure_aware_prior(
+            hare_obs, lynx_obs, prior_cfg
+        )
     simulator = build_simulator(
         years=years,
         x0=x0,
