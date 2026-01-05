@@ -272,6 +272,10 @@ def diagnostics_from_file(
     sbc_mcmc_method = str(sbc_cfg.get("mcmc_method", "slice_np"))
     inference_cfg = config.get("inference", {})
     prior_cfg = inference_cfg.get("prior", {})
+    feature_mode = str(inference_cfg.get("feature_mode", "summary"))
+    embedding_cfg = (
+        inference_cfg.get("embedding", {}) if isinstance(inference_cfg, dict) else {}
+    )
     parameter_order = list(
         inference_cfg.get(
             "parameter_order",
@@ -303,6 +307,7 @@ def diagnostics_from_file(
         dt=dt,
         noise_scale=float(inference_cfg.get("noise_scale", 0.0)),
         parameter_order=parameter_order,
+        feature_mode=feature_mode,
     )
     prior_low, prior_high = build_prior(prior_cfg, parameter_order)
 
@@ -315,6 +320,8 @@ def diagnostics_from_file(
         seed=sbc_seed,
         sample_with=sbc_sample_with,
         mcmc_method=sbc_mcmc_method,
+        feature_mode=feature_mode,
+        embedding_config=embedding_cfg,
     )
 
     from sbi.utils import BoxUniform
