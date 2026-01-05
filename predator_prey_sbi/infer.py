@@ -10,6 +10,7 @@ from predator_prey_sbi.config import load_config
 from predator_prey_sbi.data import load_lynx_hare
 from predator_prey_sbi.features import build_embedding_input, summarize_series
 from predator_prey_sbi.npe import build_prior, build_simulator, train_posterior
+from predator_prey_sbi.priors import build_structure_aware_prior
 from predator_prey_sbi.runtime import configure_runtime
 
 
@@ -40,19 +41,20 @@ def infer_from_file(config_path: str, observed_path: str) -> str:
     embedding_cfg = (
         inference_cfg.get("embedding", {}) if isinstance(inference_cfg, dict) else {}
     )
+    prior_scheme = str(inference_cfg.get("prior_scheme", "default"))
     parameter_order = list(
         inference_cfg.get(
             "parameter_order",
             [
-                "alpha",
-                "gamma",
-                "x_star",
-                "y_star",
-                "k",
-                "sigma_h",
-                "sigma_l",
+                "log_T",
+                "log_r",
+                "log_x_eq",
+                "log_y_eq",
+                "log_k_ratio",
                 "eps_h0",
                 "eps_l0",
+                "log_sigma_h",
+                "log_sigma_l",
             ],
         )
     )
@@ -65,6 +67,11 @@ def infer_from_file(config_path: str, observed_path: str) -> str:
         x0 = (float(x0_values[0]), float(x0_values[1]))
 
     dt = float(config.get("dt", 0.1))
+
+    if prior_scheme == "structure_aware":
+        parameter_order, prior_cfg = build_structure_aware_prior(
+            hare_obs, lynx_obs, prior_cfg
+        )
 
     if feature_mode.lower() == "embedding":
         embedding_obs = build_embedding_input(hare_obs, lynx_obs)
