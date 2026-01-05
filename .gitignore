@@ -205,6 +205,7 @@ cython_debug/
 .ruff_cache/
 arviz_data/
 sbi-logs/
+runs/
 
 # PyPI configuration file
 .pypirc
