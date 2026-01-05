@@ -42,6 +42,21 @@ def resolve_lv_params(values: Mapping[str, float]) -> dict[str, float]:
     return params
 
 
+def resolve_noise_scales(
+    values: Mapping[str, float],
+    default_noise: float | tuple[float, float],
+) -> float | tuple[float, float]:
+    if "sigma_h" in values or "sigma_l" in values:
+        if "sigma_h" not in values or "sigma_l" not in values:
+            raise ValueError("Both sigma_h and sigma_l are required")
+        sigma_h = float(values["sigma_h"])
+        sigma_l = float(values["sigma_l"])
+        if sigma_h < 0 or sigma_l < 0:
+            raise ValueError("sigma_h and sigma_l must be non-negative")
+        return sigma_h, sigma_l
+    return default_noise
+
+
 def resolve_initial_conditions(
     values: Mapping[str, float],
     base_x0: tuple[float, float],

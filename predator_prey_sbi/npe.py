@@ -6,7 +6,11 @@ import numpy as np
 import torch
 
 from predator_prey_sbi.features import summarize_series
-from predator_prey_sbi.parameters import resolve_initial_conditions, resolve_lv_params
+from predator_prey_sbi.parameters import (
+    resolve_initial_conditions,
+    resolve_lv_params,
+    resolve_noise_scales,
+)
 from predator_prey_sbi.types import PosteriorLike
 from predator_prey_sbi.simulator import simulate_lv
 
@@ -47,12 +51,13 @@ def build_simulator(
         }
         params = resolve_lv_params(values)
         sim_x0 = resolve_initial_conditions(values, x0)
+        sim_noise = resolve_noise_scales(values, noise_scale)
         hare_sim, lynx_sim = simulate_lv(
             years=years,
             params=params,
             x0=sim_x0,
             dt=dt,
-            noise_scale=noise_scale,
+            noise_scale=sim_noise,
             rng_seed=None,
         )
         summary = summarize_series(hare_sim, lynx_sim)

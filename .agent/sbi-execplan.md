@@ -21,6 +21,8 @@ The goal is to let a user infer predator-prey model parameters from the historic
 - [x] (2026-01-05 12:45Z) Ran inference + diagnostics with logistic prey growth; recorded improved RMSE and SBC.
 - [x] (2026-01-05 12:45Z) Ran inference + diagnostics with reparameterized posterior; recorded RMSE and SBC results for comparison.
 - [x] (2026-01-05 12:55Z) Updated diagnostics loader to accept reparameterized posterior samples.
+- [x] (2026-01-05 14:55Z) Added inferred observation noise parameters (sigma_h, sigma_l) and updated simulator wiring/configs.
+- [x] (2026-01-05 14:55Z) Ran inference + diagnostics with inferred observation noise; recorded RMSE and SBC results.
 
 ## Surprises & Discoveries
 
@@ -42,6 +44,8 @@ The goal is to let a user infer predator-prey model parameters from the historic
   Evidence: diagnostics_metrics.json in runs/2026-01-05_123555.
 - Observation: Adding logistic prey growth (carrying capacity k) materially improved RMSE (hare ~35.3, lynx ~19.9).
   Evidence: diagnostics_metrics.json in runs/2026-01-05_124403.
+- Observation: Inferring observation noise (sigma_h, sigma_l) kept hare RMSE similar while improving lynx RMSE slightly (hare ~35.3, lynx ~18.7).
+  Evidence: diagnostics_metrics.json in runs/2026-01-05_145536.
 
 ## Decision Log
 
@@ -63,13 +67,16 @@ The goal is to let a user infer predator-prey model parameters from the historic
 - Decision: Add logistic prey growth with carrying capacity k and infer it alongside other parameters.
   Rationale: The deterministic LV model underfits amplitude regulation; a carrying capacity is the smallest structural change likely to reduce RMSE.
   Date/Author: 2026-01-05, Codex
+- Decision: Infer observation noise (sigma_h, sigma_l) on the log scale instead of fixing noise_scale.
+  Rationale: Allowing separate observation noise per series reduces pressure on dynamics parameters to explain variability.
+  Date/Author: 2026-01-05, Codex
 - Decision: Assume the second column in data/LynxHare.txt is the prey (hare) series and the third column is the predator (lynx) series, with units treated as relative counts.
   Rationale: This is the common ordering for the lynx-hare dataset; the plan remains flexible if a different ordering is confirmed.
   Date/Author: 2026-01-02, Codex
 
 ## Outcomes & Retrospective
 
-Milestones 1–4 are implemented and verified with inference + diagnostics runs. The logistic prey growth experiment (carrying capacity k) improved RMSE substantially versus the baseline, suggesting model mismatch was a primary bottleneck. Further gains should likely focus on noise inference or richer summaries now that the structural model is closer to the data.
+Milestones 1–4 are implemented and verified with inference + diagnostics runs. Logistic prey growth (carrying capacity k) improved RMSE substantially versus the baseline. Adding inferred observation noise marginally improved lynx RMSE while keeping hare RMSE similar, suggesting additional gains may require richer summaries or larger simulation budgets.
 
 ## Context and Orientation
 
@@ -223,3 +230,4 @@ Change Note: 2026-01-05 11:24Z — Added a ranked list of RMSE-improvement optio
 Change Note: 2026-01-05 11:24Z — Added a decision to reparameterize LV using (alpha, gamma, x_star, y_star) and anchor initial conditions via epsilons around the first observation.
 Change Note: 2026-01-05 12:55Z — Recorded reparameterization experiment results, diagnostics loader fix, and updated progress/outcomes to reflect current state.
 Change Note: 2026-01-05 12:45Z — Added logistic prey growth with carrying capacity k and recorded the improved RMSE results.
+Change Note: 2026-01-05 14:55Z — Added inferred observation noise (sigma_h, sigma_l) and recorded the updated RMSE/SBC results.

@@ -9,7 +9,7 @@ def simulate_lv(
     params: dict[str, float],
     x0: tuple[float, float],
     dt: float,
-    noise_scale: float,
+    noise_scale: float | tuple[float, float],
     rng_seed: int | None,
 ) -> tuple[list[float], list[float]]:
     """Simulate prey/predator series with Lotka-Volterra ODE and log-normal observation noise."""
@@ -56,10 +56,11 @@ def simulate_lv(
     prey = solver.y[0]
     predator = solver.y[1]
 
-    if noise_scale > 0:
+    noise = _normalize_noise_scale(noise_scale)
+    if noise is not None:
         rng = np.random.default_rng(rng_seed)
-        prey = _apply_log_noise(prey, noise_scale, rng)
-        predator = _apply_log_noise(predator, noise_scale, rng)
+        prey = _apply_log_noise(prey, noise[0], rng)
+        predator = _apply_log_noise(predator, noise[1], rng)
 
     return prey.tolist(), predator.tolist()
 
@@ -73,3 +74,17 @@ def _apply_log_noise(
     log_series = np.log(safe)
     noisy = log_series + rng.normal(0.0, noise_scale, size=log_series.shape)
     return np.exp(noisy)
+
+
+def _normalize_noise_scale(
+    noise_scale: float | tuple[float, float],
+) -> tuple[float, float] | None:
+    if isinstance(noise_scale, tuple):
+        sigma_h, sigma_l = noise_scale
+    else:
+        sigma_h = sigma_l = float(noise_scale)
+    if sigma_h < 0 or sigma_l < 0:
+        raise ValueError("noise_scale must be non-negative")
+    if sigma_h == 0 and sigma_l == 0:
+        return None
+    return sigma_h, sigma_l

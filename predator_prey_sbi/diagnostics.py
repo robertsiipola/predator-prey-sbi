@@ -13,7 +13,11 @@ import torch
 from predator_prey_sbi.config import load_config
 from predator_prey_sbi.data import load_lynx_hare
 from predator_prey_sbi.npe import build_prior, build_simulator, train_posterior
-from predator_prey_sbi.parameters import resolve_initial_conditions, resolve_lv_params
+from predator_prey_sbi.parameters import (
+    resolve_initial_conditions,
+    resolve_lv_params,
+    resolve_noise_scales,
+)
 from predator_prey_sbi.runtime import configure_runtime
 from predator_prey_sbi.types import PosteriorLike, PriorLike
 
@@ -81,12 +85,13 @@ def posterior_predictive(
 
     for params in params_list:
         sim_x0 = resolve_initial_conditions(params, x0)
+        sim_noise = resolve_noise_scales(params, noise_scale)
         hare_sim, lynx_sim = simulate_lv(
             years=years,
             params=resolve_lv_params(params),
             x0=sim_x0,
             dt=dt,
-            noise_scale=noise_scale,
+            noise_scale=sim_noise,
             rng_seed=None,
         )
         hare_sims.append(hare_sim)
@@ -270,7 +275,17 @@ def diagnostics_from_file(
     parameter_order = list(
         inference_cfg.get(
             "parameter_order",
-            ["alpha", "gamma", "x_star", "y_star", "k", "eps_h0", "eps_l0"],
+            [
+                "alpha",
+                "gamma",
+                "x_star",
+                "y_star",
+                "k",
+                "sigma_h",
+                "sigma_l",
+                "eps_h0",
+                "eps_l0",
+            ],
         )
     )
 
