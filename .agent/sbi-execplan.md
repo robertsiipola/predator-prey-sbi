@@ -30,6 +30,7 @@ The goal is to let a user infer predator-prey model parameters from the historic
 - [x] (2026-01-05 19:10Z) Added structure-aware parameterization with data-informed priors (log_T/log_r/log_x_eq/log_y_eq/log_k_ratio).
 - [x] (2026-01-05 19:11Z) Ran inference + diagnostics with structure-aware priors; recorded RMSE and SBC results.
 - [x] (2026-01-05 19:23Z) Tightened structure-aware priors (T/r/x_eq/y_eq/k_ratio, eps, sigma) and reran inference + diagnostics; recorded RMSE and SBC results.
+- [x] (2026-01-05 19:29Z) Increased structure-aware simulation budget to 4k and reran inference + diagnostics; recorded RMSE and SBC results.
 
 ## Surprises & Discoveries
 
@@ -63,6 +64,8 @@ The goal is to let a user infer predator-prey model parameters from the historic
   Evidence: diagnostics_metrics.json in runs/2026-01-05_191017.
 - Observation: Tightening structure-aware priors slightly improved RMSE but still trails the best prior run (hare ~37.3, lynx ~19.6).
   Evidence: diagnostics_metrics.json in runs/2026-01-05_192244.
+- Observation: A 4k simulation budget with tightened structure-aware priors further improved RMSE (hare ~36.5, lynx ~18.8) but still trails the best prior run.
+  Evidence: diagnostics_metrics.json in runs/2026-01-05_192911.
 
 ## Decision Log
 
