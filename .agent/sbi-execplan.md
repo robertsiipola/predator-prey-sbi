@@ -29,6 +29,7 @@ The goal is to let a user infer predator-prey model parameters from the historic
 - [x] (2026-01-05 15:47Z) Ran inference + diagnostics with learned embedding; recorded RMSE and SBC results.
 - [x] (2026-01-05 19:10Z) Added structure-aware parameterization with data-informed priors (log_T/log_r/log_x_eq/log_y_eq/log_k_ratio).
 - [x] (2026-01-05 19:11Z) Ran inference + diagnostics with structure-aware priors; recorded RMSE and SBC results.
+- [x] (2026-01-05 19:23Z) Tightened structure-aware priors (T/r/x_eq/y_eq/k_ratio, eps, sigma) and reran inference + diagnostics; recorded RMSE and SBC results.
 
 ## Surprises & Discoveries
 
@@ -60,6 +61,8 @@ The goal is to let a user infer predator-prey model parameters from the historic
   Evidence: diagnostics_metrics.json in runs/2026-01-05_154708.
 - Observation: Structure-aware priors and parameterization did not improve RMSE in the first run (hare ~37.9, lynx ~19.9).
   Evidence: diagnostics_metrics.json in runs/2026-01-05_191017.
+- Observation: Tightening structure-aware priors slightly improved RMSE but still trails the best prior run (hare ~37.3, lynx ~19.6).
+  Evidence: diagnostics_metrics.json in runs/2026-01-05_192244.
 
 ## Decision Log
 
@@ -93,13 +96,16 @@ The goal is to let a user infer predator-prey model parameters from the historic
 - Decision: Introduce structure-aware parameters (log_T, log_r, log_x_eq, log_y_eq, log_k_ratio) with data-informed priors.
   Rationale: Enforcing K > x_eq and using interpretable scale priors should reduce wasted simulations and improve identifiability.
   Date/Author: 2026-01-05, Codex
+- Decision: Tighten structure-aware priors to focus on plausible cycle periods (8–14 years), equilibria near the data medians, and smaller observation noise.
+  Rationale: Narrower, data-informed priors reduce wasted simulations and stabilize the embedding network without over-constraining dynamics.
+  Date/Author: 2026-01-05, Codex
 - Decision: Assume the second column in data/LynxHare.txt is the prey (hare) series and the third column is the predator (lynx) series, with units treated as relative counts.
   Rationale: This is the common ordering for the lynx-hare dataset; the plan remains flexible if a different ordering is confirmed.
   Date/Author: 2026-01-02, Codex
 
 ## Outcomes & Retrospective
 
-Milestones 1–4 are implemented and verified with inference + diagnostics runs. Logistic prey growth (carrying capacity k) improved RMSE substantially versus the baseline. Adding inferred observation noise marginally improved lynx RMSE while keeping hare RMSE similar, while mechanistic regression summaries, the learned embedding, and the structure-aware priors did not improve RMSE in the first trials; further gains likely need a larger simulation budget, alternative priors, or model/observation adjustments.
+Milestones 1–4 are implemented and verified with inference + diagnostics runs. Logistic prey growth (carrying capacity k) improved RMSE substantially versus the baseline. Adding inferred observation noise marginally improved lynx RMSE while keeping hare RMSE similar, while mechanistic regression summaries, the learned embedding, and the structure-aware priors (even after tightening) did not improve RMSE in the first trials; further gains likely need a larger simulation budget, alternative priors, or model/observation adjustments.
 
 ## Context and Orientation
 

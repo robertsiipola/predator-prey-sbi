@@ -31,15 +31,15 @@ def build_structure_aware_prior(
         return [math.log(low), math.log(high)]
 
     defaults: dict[str, list[float]] = {
-        "log_T": log_range(6.0, 16.0),
-        "log_r": log_range(0.5, 2.0),
-        "log_x_eq": log_range(0.5 * hare_med, 2.0 * hare_med),
-        "log_y_eq": log_range(0.5 * lynx_med, 2.0 * lynx_med),
-        "log_k_ratio": log_range(1.05, 8.0),
-        "eps_h0": [-0.2, 0.2],
-        "eps_l0": [-0.2, 0.2],
-        "log_sigma_h": log_range(0.05, 0.4),
-        "log_sigma_l": log_range(0.05, 0.4),
+        "log_T": log_range(8.0, 14.0),
+        "log_r": log_range(0.7, 1.4),
+        "log_x_eq": log_range(0.6 * hare_med, 1.6 * hare_med),
+        "log_y_eq": log_range(0.6 * lynx_med, 1.6 * lynx_med),
+        "log_k_ratio": log_range(1.2, 4.5),
+        "eps_h0": [-0.15, 0.15],
+        "eps_l0": [-0.15, 0.15],
+        "log_sigma_h": log_range(0.05, 0.3),
+        "log_sigma_l": log_range(0.05, 0.3),
     }
 
     if overrides:
