@@ -6,6 +6,7 @@ import numpy as np
 import torch
 
 from predator_prey_sbi.features import summarize_series
+from predator_prey_sbi.parameters import resolve_initial_conditions, resolve_lv_params
 from predator_prey_sbi.types import PosteriorLike
 from predator_prey_sbi.simulator import simulate_lv
 
@@ -41,17 +42,11 @@ def build_simulator(
         theta_np = theta.detach().cpu().numpy().astype(float)
         if theta_np.shape[0] != len(parameter_order):
             raise ValueError("Theta dimension does not match parameter order")
-        values = {name: float(theta_np[idx]) for idx, name in enumerate(parameter_order)}
-        params = {
-            "alpha": values["alpha"],
-            "beta": values["beta"],
-            "delta": values["delta"],
-            "gamma": values["gamma"],
+        values = {
+            name: float(theta_np[idx]) for idx, name in enumerate(parameter_order)
         }
-        if "hare0" in values and "lynx0" in values:
-            sim_x0 = (values["hare0"], values["lynx0"])
-        else:
-            sim_x0 = x0
+        params = resolve_lv_params(values)
+        sim_x0 = resolve_initial_conditions(values, x0)
         hare_sim, lynx_sim = simulate_lv(
             years=years,
             params=params,

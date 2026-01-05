@@ -38,7 +38,8 @@ def infer_from_file(config_path: str, observed_path: str) -> str:
     mcmc_method = str(inference_cfg.get("mcmc_method", "slice_np"))
     parameter_order = list(
         inference_cfg.get(
-            "parameter_order", ["alpha", "beta", "delta", "gamma"]
+            "parameter_order",
+            ["alpha", "gamma", "x_star", "y_star", "eps_h0", "eps_l0"],
         )
     )
 

@@ -13,6 +13,7 @@ import torch
 from predator_prey_sbi.config import load_config
 from predator_prey_sbi.data import load_lynx_hare
 from predator_prey_sbi.npe import build_prior, build_simulator, train_posterior
+from predator_prey_sbi.parameters import resolve_initial_conditions, resolve_lv_params
 from predator_prey_sbi.runtime import configure_runtime
 from predator_prey_sbi.types import PosteriorLike, PriorLike
 
@@ -27,10 +28,16 @@ def _make_run_dir(base_dir: str) -> Path:
 def _load_posterior_samples(path: str) -> dict[str, np.ndarray]:
     data = np.load(path)
     samples = {key: data[key] for key in data.files}
-    required = {"alpha", "beta", "delta", "gamma"}
-    if not required.issubset(samples):
-        missing = required.difference(samples)
-        raise ValueError(f"Posterior samples missing keys: {sorted(missing)}")
+    base_required = {"alpha", "beta", "delta", "gamma"}
+    reparam_required = {"alpha", "gamma", "x_star", "y_star"}
+    if base_required.issubset(samples) or reparam_required.issubset(samples):
+        return samples
+    missing_base = sorted(base_required.difference(samples))
+    missing_reparam = sorted(reparam_required.difference(samples))
+    raise ValueError(
+        "Posterior samples missing keys for either parameterization. "
+        f"Base missing: {missing_base}; reparam missing: {missing_reparam}"
+    )
     return samples
 
 
@@ -47,7 +54,9 @@ def _sample_posterior_params(
     indices = rng.choice(sample_count, size=num_draws, replace=replace)
     params_list: list[dict[str, float]] = []
     for idx in indices:
-        params_list.append({key: float(values[idx]) for key, values in posterior_samples.items()})
+        params_list.append(
+            {key: float(values[idx]) for key, values in posterior_samples.items()}
+        )
     return params_list
 
 
@@ -71,17 +80,10 @@ def posterior_predictive(
     from predator_prey_sbi.simulator import simulate_lv
 
     for params in params_list:
-        sim_x0 = x0
-        if "hare0" in params and "lynx0" in params:
-            sim_x0 = (params["hare0"], params["lynx0"])
+        sim_x0 = resolve_initial_conditions(params, x0)
         hare_sim, lynx_sim = simulate_lv(
             years=years,
-            params={
-                "alpha": params["alpha"],
-                "beta": params["beta"],
-                "delta": params["delta"],
-                "gamma": params["gamma"],
-            },
+            params=resolve_lv_params(params),
             x0=sim_x0,
             dt=dt,
             noise_scale=noise_scale,
@@ -266,7 +268,10 @@ def diagnostics_from_file(
     inference_cfg = config.get("inference", {})
     prior_cfg = inference_cfg.get("prior", {})
     parameter_order = list(
-        inference_cfg.get("parameter_order", ["alpha", "beta", "delta", "gamma"])
+        inference_cfg.get(
+            "parameter_order",
+            ["alpha", "gamma", "x_star", "y_star", "eps_h0", "eps_l0"],
+        )
     )
 
     use_observed_initial = bool(config.get("use_observed_initial", True))
