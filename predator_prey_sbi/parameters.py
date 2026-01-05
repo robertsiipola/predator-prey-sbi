@@ -5,6 +5,11 @@ from typing import Mapping
 
 
 def resolve_lv_params(values: Mapping[str, float]) -> dict[str, float]:
+    k = None
+    if "k" in values:
+        k = float(values["k"])
+        if k <= 0:
+            raise ValueError("k (carrying capacity) must be positive")
     if {"x_star", "y_star"}.issubset(values):
         for key in ("alpha", "gamma", "x_star", "y_star"):
             if key not in values:
@@ -26,12 +31,15 @@ def resolve_lv_params(values: Mapping[str, float]) -> dict[str, float]:
         delta = float(values["delta"])
         gamma = float(values["gamma"])
 
-    return {
+    params = {
         "alpha": alpha,
         "beta": beta,
         "delta": delta,
         "gamma": gamma,
     }
+    if k is not None:
+        params["k"] = k
+    return params
 
 
 def resolve_initial_conditions(

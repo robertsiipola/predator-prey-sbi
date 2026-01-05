@@ -27,10 +27,16 @@ def simulate_lv(
     beta = params["beta"]
     delta = params["delta"]
     gamma = params["gamma"]
+    k = params.get("k")
+    if k is not None and k <= 0:
+        raise ValueError("k (carrying capacity) must be positive")
 
     def dynamics(_: float, state: np.ndarray) -> np.ndarray:
         prey, predator = state
-        d_prey = alpha * prey - beta * prey * predator
+        if k is None:
+            d_prey = alpha * prey - beta * prey * predator
+        else:
+            d_prey = alpha * prey * (1.0 - prey / k) - beta * prey * predator
         d_predator = delta * prey * predator - gamma * predator
         return np.array([d_prey, d_predator], dtype=float)
 
