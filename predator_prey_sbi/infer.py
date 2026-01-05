@@ -8,7 +8,7 @@ import torch
 
 from predator_prey_sbi.config import load_config
 from predator_prey_sbi.data import load_lynx_hare
-from predator_prey_sbi.features import summarize_series
+from predator_prey_sbi.features import build_embedding_input, summarize_series
 from predator_prey_sbi.npe import build_prior, build_simulator, train_posterior
 from predator_prey_sbi.runtime import configure_runtime
 
@@ -36,6 +36,10 @@ def infer_from_file(config_path: str, observed_path: str) -> str:
     prior_cfg = inference_cfg.get("prior", {})
     sample_with = str(inference_cfg.get("sample_with", "rejection"))
     mcmc_method = str(inference_cfg.get("mcmc_method", "slice_np"))
+    feature_mode = str(inference_cfg.get("feature_mode", "summary"))
+    embedding_cfg = (
+        inference_cfg.get("embedding", {}) if isinstance(inference_cfg, dict) else {}
+    )
     parameter_order = list(
         inference_cfg.get(
             "parameter_order",
@@ -62,8 +66,12 @@ def infer_from_file(config_path: str, observed_path: str) -> str:
 
     dt = float(config.get("dt", 0.1))
 
-    summary_obs = summarize_series(hare_obs, lynx_obs)
-    x_o = torch.tensor(summary_obs, dtype=torch.float32).unsqueeze(0)
+    if feature_mode.lower() == "embedding":
+        embedding_obs = build_embedding_input(hare_obs, lynx_obs)
+        x_o = torch.tensor(embedding_obs, dtype=torch.float32).unsqueeze(0)
+    else:
+        summary_obs = summarize_series(hare_obs, lynx_obs)
+        x_o = torch.tensor(summary_obs, dtype=torch.float32).unsqueeze(0)
 
     simulator = build_simulator(
         years=years,
@@ -71,6 +79,7 @@ def infer_from_file(config_path: str, observed_path: str) -> str:
         dt=dt,
         noise_scale=noise_scale,
         parameter_order=parameter_order,
+        feature_mode=feature_mode,
     )
 
     prior_low, prior_high = build_prior(prior_cfg, parameter_order)
@@ -83,6 +92,8 @@ def infer_from_file(config_path: str, observed_path: str) -> str:
         seed=seed,
         sample_with=sample_with,
         mcmc_method=mcmc_method,
+        feature_mode=feature_mode,
+        embedding_config=embedding_cfg,
     )
 
     samples = posterior.sample((num_samples,), x=x_o)

@@ -53,6 +53,21 @@ def summarize_series(hare: Iterable[float], lynx: Iterable[float]) -> list[float
     ]
 
 
+def build_embedding_input(hare: Iterable[float], lynx: Iterable[float]) -> np.ndarray:
+    hare_arr = np.asarray(list(hare), dtype=float)
+    lynx_arr = np.asarray(list(lynx), dtype=float)
+    if hare_arr.size < 2 or lynx_arr.size < 2:
+        raise ValueError("Hare and lynx series must have at least two observations")
+
+    hare_log = np.log1p(np.clip(hare_arr, 0.0, None))
+    lynx_log = np.log1p(np.clip(lynx_arr, 0.0, None))
+    hare_diff = np.concatenate(([0.0], np.diff(hare_log)))
+    lynx_diff = np.concatenate(([0.0], np.diff(lynx_log)))
+    return np.stack([hare_log, lynx_log, hare_diff, lynx_diff], axis=0).astype(
+        np.float32
+    )
+
+
 def _basic_stats(series: np.ndarray) -> tuple[float, float, float, float]:
     mean = float(np.mean(series))
     std = float(np.std(series))

@@ -5,7 +5,8 @@ from typing import Any, Callable, cast
 import numpy as np
 import torch
 
-from predator_prey_sbi.features import summarize_series
+from predator_prey_sbi.embedding import build_embedding_net
+from predator_prey_sbi.features import build_embedding_input, summarize_series
 from predator_prey_sbi.parameters import (
     resolve_initial_conditions,
     resolve_lv_params,
@@ -41,7 +42,10 @@ def build_simulator(
     dt: float,
     noise_scale: float,
     parameter_order: list[str],
+    feature_mode: str = "summary",
 ) -> Simulator:
+    mode = feature_mode.lower()
+
     def simulator(theta: torch.Tensor) -> torch.Tensor:
         theta_np = theta.detach().cpu().numpy().astype(float)
         if theta_np.shape[0] != len(parameter_order):
@@ -60,8 +64,13 @@ def build_simulator(
             noise_scale=sim_noise,
             rng_seed=None,
         )
-        summary = summarize_series(hare_sim, lynx_sim)
-        return torch.tensor(summary, dtype=torch.float32)
+        if mode == "embedding":
+            features = build_embedding_input(hare_sim, lynx_sim)
+        else:
+            features = np.asarray(
+                summarize_series(hare_sim, lynx_sim), dtype=np.float32
+            )
+        return torch.tensor(features, dtype=torch.float32)
 
     return simulator
 
@@ -75,6 +84,8 @@ def train_posterior(
     seed: int | None,
     sample_with: str,
     mcmc_method: str,
+    feature_mode: str = "summary",
+    embedding_config: dict[str, Any] | None = None,
 ) -> tuple[PosteriorLike, torch.Tensor, torch.Tensor]:
     if seed is not None:
         torch.manual_seed(seed)
@@ -82,11 +93,25 @@ def train_posterior(
 
     from sbi.inference import SNPE, prepare_for_sbi, simulate_for_sbi
     from sbi.utils import BoxUniform
+    from sbi.utils import get_nn_models
 
     prior = BoxUniform(low=prior_low, high=prior_high)
     prepared_simulator, prepared_prior = prepare_for_sbi(simulator, prior)
-
-    inference = SNPE(prior=prepared_prior)
+    mode = feature_mode.lower()
+    if mode == "embedding":
+        embed_cfg = embedding_config or {}
+        embedding_net = build_embedding_net(embed_cfg)
+        density_estimator = get_nn_models.posterior_nn(
+            model=str(embed_cfg.get("model", "nsf")),
+            z_score_x=str(embed_cfg.get("z_score_x", "structured")),
+            hidden_features=int(embed_cfg.get("hidden_features", 50)),
+            num_transforms=int(embed_cfg.get("num_transforms", 5)),
+            num_bins=int(embed_cfg.get("num_bins", 10)),
+            embedding_net=embedding_net,
+        )
+        inference = SNPE(prior=prepared_prior, density_estimator=density_estimator)
+    else:
+        inference = SNPE(prior=prepared_prior)
     theta, x = simulate_for_sbi(
         prepared_simulator,
         proposal=prepared_prior,
