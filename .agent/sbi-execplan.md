@@ -17,6 +17,8 @@ The goal is to let a user infer predator-prey model parameters from the historic
 - [x] (2026-01-04 18:53Z) Implemented neural SBI inference pipeline and ran it on Lynx-Hare data.
 - [x] (2026-01-04 19:02Z) Added diagnostics (posterior predictive + SBC) and validated with a full diagnostics run.
 - [x] (2026-01-05 12:35Z) Reparameterized LV and anchored initial conditions, adding shared parameter-resolution helpers and updating configs/defaults.
+- [x] (2026-01-05 12:44Z) Added logistic prey growth via carrying capacity k and updated priors/configs to include it.
+- [x] (2026-01-05 12:45Z) Ran inference + diagnostics with logistic prey growth; recorded improved RMSE and SBC.
 - [x] (2026-01-05 12:45Z) Ran inference + diagnostics with reparameterized posterior; recorded RMSE and SBC results for comparison.
 - [x] (2026-01-05 12:55Z) Updated diagnostics loader to accept reparameterized posterior samples.
 
@@ -38,6 +40,8 @@ The goal is to let a user infer predator-prey model parameters from the historic
   Evidence: ValueError "Posterior samples missing keys: ['beta', 'delta']" when running diagnostics on runs/2026-01-05_123432.
 - Observation: Reparameterized LV with anchored initial conditions did not improve RMSE in the first run (hare ~50.5, lynx ~23.7).
   Evidence: diagnostics_metrics.json in runs/2026-01-05_123555.
+- Observation: Adding logistic prey growth (carrying capacity k) materially improved RMSE (hare ~35.3, lynx ~19.9).
+  Evidence: diagnostics_metrics.json in runs/2026-01-05_124403.
 
 ## Decision Log
 
@@ -56,13 +60,16 @@ The goal is to let a user infer predator-prey model parameters from the historic
 - Decision: Reparameterize Lotka-Volterra using (alpha, gamma, x_star, y_star) and derive beta=alpha/y_star and delta=gamma/x_star; anchor initial conditions via eps_h0/eps_l0 around the first observation.
   Rationale: This reduces identifiability issues and keeps initial conditions from absorbing dynamics mismatch while still allowing modest adjustments.
   Date/Author: 2026-01-05, Codex
+- Decision: Add logistic prey growth with carrying capacity k and infer it alongside other parameters.
+  Rationale: The deterministic LV model underfits amplitude regulation; a carrying capacity is the smallest structural change likely to reduce RMSE.
+  Date/Author: 2026-01-05, Codex
 - Decision: Assume the second column in data/LynxHare.txt is the prey (hare) series and the third column is the predator (lynx) series, with units treated as relative counts.
   Rationale: This is the common ordering for the lynx-hare dataset; the plan remains flexible if a different ordering is confirmed.
   Date/Author: 2026-01-02, Codex
 
 ## Outcomes & Retrospective
 
-Milestones 1–4 are implemented and verified with inference + diagnostics runs. The first RMSE-improvement experiment (reparameterized LV with anchored initial conditions) produced similar RMSE to the baseline, suggesting the next improvements should target model mismatch (logistic prey growth or noise inference) or more informative summaries.
+Milestones 1–4 are implemented and verified with inference + diagnostics runs. The logistic prey growth experiment (carrying capacity k) improved RMSE substantially versus the baseline, suggesting model mismatch was a primary bottleneck. Further gains should likely focus on noise inference or richer summaries now that the structural model is closer to the data.
 
 ## Context and Orientation
 
@@ -215,3 +222,4 @@ Change Note: 2026-01-04 19:02Z — Implemented diagnostics, added SBC and poster
 Change Note: 2026-01-05 11:24Z — Added a ranked list of RMSE-improvement options (model extensions, noise, initial conditions, simulation budget, summary refinement) and recorded that initial-condition inference did not reduce RMSE in the first trial.
 Change Note: 2026-01-05 11:24Z — Added a decision to reparameterize LV using (alpha, gamma, x_star, y_star) and anchor initial conditions via epsilons around the first observation.
 Change Note: 2026-01-05 12:55Z — Recorded reparameterization experiment results, diagnostics loader fix, and updated progress/outcomes to reflect current state.
+Change Note: 2026-01-05 12:45Z — Added logistic prey growth with carrying capacity k and recorded the improved RMSE results.

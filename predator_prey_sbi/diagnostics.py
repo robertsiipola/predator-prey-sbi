@@ -270,7 +270,7 @@ def diagnostics_from_file(
     parameter_order = list(
         inference_cfg.get(
             "parameter_order",
-            ["alpha", "gamma", "x_star", "y_star", "eps_h0", "eps_l0"],
+            ["alpha", "gamma", "x_star", "y_star", "k", "eps_h0", "eps_l0"],
         )
     )
 
