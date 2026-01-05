@@ -13,16 +13,21 @@ from predator_prey_sbi.simulator import simulate_lv
 Simulator = Callable[[torch.Tensor], torch.Tensor]
 
 
-def build_prior(prior_config: dict[str, Any]) -> tuple[torch.Tensor, torch.Tensor]:
-    alpha_low, alpha_high = prior_config["alpha"]
-    beta_low, beta_high = prior_config["beta"]
-    delta_low, delta_high = prior_config["delta"]
-    gamma_low, gamma_high = prior_config["gamma"]
-    low = torch.tensor([alpha_low, beta_low, delta_low, gamma_low], dtype=torch.float32)
-    high = torch.tensor(
-        [alpha_high, beta_high, delta_high, gamma_high], dtype=torch.float32
-    )
-    return low, high
+def build_prior(
+    prior_config: dict[str, Any],
+    parameter_order: list[str],
+) -> tuple[torch.Tensor, torch.Tensor]:
+    lows: list[float] = []
+    highs: list[float] = []
+    for name in parameter_order:
+        if name not in prior_config:
+            raise ValueError(f"Missing prior range for parameter: {name}")
+        low, high = prior_config[name]
+        lows.append(float(low))
+        highs.append(float(high))
+    low_tensor = torch.tensor(lows, dtype=torch.float32)
+    high_tensor = torch.tensor(highs, dtype=torch.float32)
+    return low_tensor, high_tensor
 
 
 def build_simulator(
@@ -30,19 +35,27 @@ def build_simulator(
     x0: tuple[float, float],
     dt: float,
     noise_scale: float,
+    parameter_order: list[str],
 ) -> Simulator:
     def simulator(theta: torch.Tensor) -> torch.Tensor:
         theta_np = theta.detach().cpu().numpy().astype(float)
+        if theta_np.shape[0] != len(parameter_order):
+            raise ValueError("Theta dimension does not match parameter order")
+        values = {name: float(theta_np[idx]) for idx, name in enumerate(parameter_order)}
         params = {
-            "alpha": float(theta_np[0]),
-            "beta": float(theta_np[1]),
-            "delta": float(theta_np[2]),
-            "gamma": float(theta_np[3]),
+            "alpha": values["alpha"],
+            "beta": values["beta"],
+            "delta": values["delta"],
+            "gamma": values["gamma"],
         }
+        if "hare0" in values and "lynx0" in values:
+            sim_x0 = (values["hare0"], values["lynx0"])
+        else:
+            sim_x0 = x0
         hare_sim, lynx_sim = simulate_lv(
             years=years,
             params=params,
-            x0=x0,
+            x0=sim_x0,
             dt=dt,
             noise_scale=noise_scale,
             rng_seed=None,
@@ -60,6 +73,8 @@ def train_posterior(
     num_simulations: int,
     num_workers: int,
     seed: int | None,
+    sample_with: str,
+    mcmc_method: str,
 ) -> tuple[PosteriorLike, torch.Tensor, torch.Tensor]:
     if seed is not None:
         torch.manual_seed(seed)
@@ -79,6 +94,13 @@ def train_posterior(
         num_workers=num_workers,
     )
     density_estimator = inference.append_simulations(theta, x).train()
-    posterior = cast(PosteriorLike, inference.build_posterior(density_estimator))
+    posterior = cast(
+        PosteriorLike,
+        inference.build_posterior(
+            density_estimator=density_estimator,
+            sample_with=sample_with,
+            mcmc_method=mcmc_method,
+        ),
+    )
 
     return posterior, theta, x

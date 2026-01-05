@@ -27,19 +27,30 @@ plot:
 output_dir: runs
 
 inference:
-  num_simulations: 500
-  num_samples: 500
+  num_simulations: 2000
+  num_samples: 300
   num_workers: 1
   seed: 0
   noise_scale: 0.0
+  sample_with: rejection
+  mcmc_method: slice_np
+  parameter_order:
+    - alpha
+    - beta
+    - delta
+    - gamma
+    - hare0
+    - lynx0
   prior:
     alpha: [0.2, 3.0]
     beta: [0.05, 1.5]
     delta: [0.05, 1.5]
     gamma: [0.2, 3.0]
+    hare0: [1.0, 200.0]
+    lynx0: [1.0, 100.0]
 
 diagnostics:
-  posterior_draws: 200
+  posterior_draws: 300
   seed: 0
   noise_scale: 0.0
   sbc:
@@ -48,3 +59,5 @@ diagnostics:
     num_posterior_samples: 200
     num_workers: 1
     seed: 0
+    sample_with: rejection
+    mcmc_method: slice_np

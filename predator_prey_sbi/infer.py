@@ -34,6 +34,13 @@ def infer_from_file(config_path: str, observed_path: str) -> str:
     seed = inference_cfg.get("seed", 0)
     noise_scale = float(inference_cfg.get("noise_scale", 0.0))
     prior_cfg = inference_cfg.get("prior", {})
+    sample_with = str(inference_cfg.get("sample_with", "rejection"))
+    mcmc_method = str(inference_cfg.get("mcmc_method", "slice_np"))
+    parameter_order = list(
+        inference_cfg.get(
+            "parameter_order", ["alpha", "beta", "delta", "gamma"]
+        )
+    )
 
     use_observed_initial = bool(config.get("use_observed_initial", True))
     if use_observed_initial:
@@ -52,9 +59,10 @@ def infer_from_file(config_path: str, observed_path: str) -> str:
         x0=x0,
         dt=dt,
         noise_scale=noise_scale,
+        parameter_order=parameter_order,
     )
 
-    prior_low, prior_high = build_prior(prior_cfg)
+    prior_low, prior_high = build_prior(prior_cfg, parameter_order)
     posterior, _, _ = train_posterior(
         simulator=simulator,
         prior_low=prior_low,
@@ -62,6 +70,8 @@ def infer_from_file(config_path: str, observed_path: str) -> str:
         num_simulations=num_simulations,
         num_workers=num_workers,
         seed=seed,
+        sample_with=sample_with,
+        mcmc_method=mcmc_method,
     )
 
     samples = posterior.sample((num_samples,), x=x_o)
@@ -69,13 +79,11 @@ def infer_from_file(config_path: str, observed_path: str) -> str:
     output_dir = str(inference_cfg.get("output_dir", config.get("output_dir", "runs")))
     run_dir = _make_run_dir(output_dir)
     output_path = run_dir / "posterior_samples.npz"
-    np.savez(
-        output_path,
-        alpha=samples[:, 0].detach().cpu().numpy(),
-        beta=samples[:, 1].detach().cpu().numpy(),
-        delta=samples[:, 2].detach().cpu().numpy(),
-        gamma=samples[:, 3].detach().cpu().numpy(),
-    )
+    sample_arrays = {
+        name: samples[:, idx].detach().cpu().numpy()
+        for idx, name in enumerate(parameter_order)
+    }
+    np.savez(output_path, **sample_arrays)
 
     print(
         "Training neural posterior estimator with sbi on {n} simulations".format(

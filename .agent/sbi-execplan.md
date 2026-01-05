@@ -29,6 +29,8 @@ The goal is to let a user infer predator-prey model parameters from the historic
   Evidence: make infer produced a posterior_samples.npz after training 500 simulations.
 - Observation: Diagnostics completed with posterior predictive RMSE of ~49 (hare) and ~22 (lynx) and SBC coverage between 0.65 and 0.85 for default settings.
   Evidence: diagnostics_metrics.json in runs/2026-01-04_190213.
+- Observation: Adding inferred initial conditions (hare0/lynx0) and richer summaries did not reduce RMSE in the first trial (hare ~58, lynx ~32).
+  Evidence: diagnostics_metrics.json in runs/2026-01-04_211553.
 
 ## Decision Log
 
@@ -81,6 +83,8 @@ Milestone 3 implements the full inference pipeline. It trains a neural posterior
 Milestone 4 adds diagnostics and validation. This includes posterior predictive checks (simulate from the posterior and compare to observed data), simulation-based calibration (SBC) on synthetic datasets, and simple coverage checks (how often the true parameters are within credible intervals for synthetic data). The milestone ends with a reproducible command that runs diagnostics and produces a short report or plot, confirming that the inference is at least qualitatively reasonable.
 
 Milestone 5 cleans up the user workflow: add a CLI entry point (python -m ...) with a configuration file, update README.md with usage, and add tests for core pieces like the simulator and summary-statistics feature extraction. The deliverable is a single end-to-end command that trains/infers and writes posterior samples and plots, and tests that pass with ruff and ty checks.
+
+To minimize posterior predictive RMSE when the baseline model underfits, prioritize the following improvement options in order of expected impact. First, extend the simulator to include logistic prey growth (a carrying capacity parameter) so the model can reproduce amplitude regulation; this adds one parameter but typically improves both phase and amplitude fit. Second, add process noise (stochastic LV) or infer observation noise to capture irregular cycle amplitudes; this often reduces RMSE at the cost of a slightly broader posterior. Third, infer initial conditions (hare0/lynx0) and optional scaling factors for observed counts to align simulated amplitude with data; this helps when the oscillation scale is mismatched. Fourth, increase the simulation budget or move to multi-round SNPE to reduce estimator bias once the model is expressive enough. Finally, refine summary statistics (e.g., period from autocorrelation, phase lag, peak amplitude ratios) if the posterior predictive plot suggests phase or amplitude mismatches despite a good average fit.
 
 ## Concrete Steps
 
@@ -198,3 +202,4 @@ Change Note: 2026-01-03 06:31Z — Updated Progress to reflect completion of Mil
 Change Note: 2026-01-04 17:35Z — Marked Milestone 2 complete, documented arviz home-directory permission issue, and recorded the decision to set HOME/MPLCONFIGDIR for SBI commands.
 Change Note: 2026-01-04 18:53Z — Completed Milestone 3 by adding the inference pipeline, config wiring, and runtime helpers, and validated it with a successful inference run.
 Change Note: 2026-01-04 19:02Z — Implemented diagnostics, added SBC and posterior predictive checks, and validated with a full diagnostics run.
+Change Note: 2026-01-05 11:24Z — Added a ranked list of RMSE-improvement options (model extensions, noise, initial conditions, simulation budget, summary refinement) and recorded that initial-condition inference did not reduce RMSE in the first trial.

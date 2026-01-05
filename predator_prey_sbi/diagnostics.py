@@ -26,11 +26,12 @@ def _make_run_dir(base_dir: str) -> Path:
 
 def _load_posterior_samples(path: str) -> dict[str, np.ndarray]:
     data = np.load(path)
+    samples = {key: data[key] for key in data.files}
     required = {"alpha", "beta", "delta", "gamma"}
-    if not required.issubset(data.files):
-        missing = required.difference(data.files)
+    if not required.issubset(samples):
+        missing = required.difference(samples)
         raise ValueError(f"Posterior samples missing keys: {sorted(missing)}")
-    return {key: data[key] for key in required}
+    return samples
 
 
 def _sample_posterior_params(
@@ -39,21 +40,14 @@ def _sample_posterior_params(
     seed: int | None,
 ) -> list[dict[str, float]]:
     rng = np.random.default_rng(seed)
-    sample_count = len(posterior_samples["alpha"])
+    sample_count = len(next(iter(posterior_samples.values())))
     if sample_count == 0:
         raise ValueError("Posterior samples are empty")
     replace = num_draws > sample_count
     indices = rng.choice(sample_count, size=num_draws, replace=replace)
     params_list: list[dict[str, float]] = []
     for idx in indices:
-        params_list.append(
-            {
-                "alpha": float(posterior_samples["alpha"][idx]),
-                "beta": float(posterior_samples["beta"][idx]),
-                "delta": float(posterior_samples["delta"][idx]),
-                "gamma": float(posterior_samples["gamma"][idx]),
-            }
-        )
+        params_list.append({key: float(values[idx]) for key, values in posterior_samples.items()})
     return params_list
 
 
@@ -77,10 +71,18 @@ def posterior_predictive(
     from predator_prey_sbi.simulator import simulate_lv
 
     for params in params_list:
+        sim_x0 = x0
+        if "hare0" in params and "lynx0" in params:
+            sim_x0 = (params["hare0"], params["lynx0"])
         hare_sim, lynx_sim = simulate_lv(
             years=years,
-            params=params,
-            x0=x0,
+            params={
+                "alpha": params["alpha"],
+                "beta": params["beta"],
+                "delta": params["delta"],
+                "gamma": params["gamma"],
+            },
+            x0=sim_x0,
             dt=dt,
             noise_scale=noise_scale,
             rng_seed=None,
@@ -129,15 +131,21 @@ def posterior_predictive(
 def _sbc_rank_histogram(
     ranks: dict[str, list[int]],
     num_samples: int,
+    parameter_order: list[str],
     output_path: Path,
 ) -> None:
-    fig, axes = plt.subplots(2, 2, figsize=(10, 6))
-    params = ["alpha", "beta", "delta", "gamma"]
-    for ax, param in zip(axes.ravel(), params, strict=True):
+    n_params = len(parameter_order)
+    ncols = 2
+    nrows = int(np.ceil(n_params / ncols))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(10, 4 * nrows))
+    axes_list = np.ravel(axes)
+    for ax, param in zip(axes_list, parameter_order, strict=False):
         ax.hist(ranks[param], bins=10, range=(0, num_samples), color="tab:gray")
         ax.set_title(param)
         ax.set_xlabel("Rank")
         ax.set_ylabel("Count")
+    for ax in axes_list[n_params:]:
+        ax.axis("off")
     fig.tight_layout()
     fig.savefig(output_path)
     plt.close(fig)
@@ -151,20 +159,21 @@ def run_sbc(
     num_posterior_samples: int,
     seed: int | None,
     output_dir: Path,
+    parameter_order: list[str],
 ) -> dict[str, Any]:
     if seed is not None:
         torch.manual_seed(seed)
         np.random.seed(seed)
 
-    ranks = {"alpha": [], "beta": [], "delta": [], "gamma": []}
-    coverage_counts = {"alpha": 0, "beta": 0, "delta": 0, "gamma": 0}
+    ranks = {param: [] for param in parameter_order}
+    coverage_counts = {param: 0 for param in parameter_order}
 
     for _ in range(num_datasets):
         theta_true = prior.sample((1,))
         x = simulator(theta_true[0]).unsqueeze(0)
         posterior_samples = posterior.sample((num_posterior_samples,), x=x)
 
-        for idx, param in enumerate(["alpha", "beta", "delta", "gamma"]):
+        for idx, param in enumerate(parameter_order):
             samples = posterior_samples[:, idx].detach().cpu().numpy()
             true_val = float(theta_true[0, idx].detach().cpu().numpy())
             rank = int(np.sum(samples < true_val))
@@ -181,7 +190,7 @@ def run_sbc(
     }
 
     hist_path = output_dir / "sbc_rank_histogram.png"
-    _sbc_rank_histogram(ranks, num_posterior_samples, hist_path)
+    _sbc_rank_histogram(ranks, num_posterior_samples, parameter_order, hist_path)
 
     return {
         "sbc_rank_histogram": str(hist_path),
@@ -252,7 +261,13 @@ def diagnostics_from_file(
     sbc_num_workers = int(
         sbc_cfg.get("num_workers", config.get("inference", {}).get("num_workers", 1))
     )
-    prior_cfg = config.get("inference", {}).get("prior", {})
+    sbc_sample_with = str(sbc_cfg.get("sample_with", "rejection"))
+    sbc_mcmc_method = str(sbc_cfg.get("mcmc_method", "slice_np"))
+    inference_cfg = config.get("inference", {})
+    prior_cfg = inference_cfg.get("prior", {})
+    parameter_order = list(
+        inference_cfg.get("parameter_order", ["alpha", "beta", "delta", "gamma"])
+    )
 
     use_observed_initial = bool(config.get("use_observed_initial", True))
     if use_observed_initial:
@@ -266,9 +281,10 @@ def diagnostics_from_file(
         years=years,
         x0=x0,
         dt=dt,
-        noise_scale=float(config.get("inference", {}).get("noise_scale", 0.0)),
+        noise_scale=float(inference_cfg.get("noise_scale", 0.0)),
+        parameter_order=parameter_order,
     )
-    prior_low, prior_high = build_prior(prior_cfg)
+    prior_low, prior_high = build_prior(prior_cfg, parameter_order)
 
     posterior, _, _ = train_posterior(
         simulator=simulator,
@@ -277,6 +293,8 @@ def diagnostics_from_file(
         num_simulations=sbc_num_simulations,
         num_workers=sbc_num_workers,
         seed=sbc_seed,
+        sample_with=sbc_sample_with,
+        mcmc_method=sbc_mcmc_method,
     )
 
     from sbi.utils import BoxUniform
@@ -291,6 +309,7 @@ def diagnostics_from_file(
             num_posterior_samples=sbc_num_samples,
             seed=sbc_seed,
             output_dir=run_dir,
+            parameter_order=parameter_order,
         )
     )
 
