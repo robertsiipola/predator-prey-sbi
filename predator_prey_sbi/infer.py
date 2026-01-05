@@ -39,7 +39,17 @@ def infer_from_file(config_path: str, observed_path: str) -> str:
     parameter_order = list(
         inference_cfg.get(
             "parameter_order",
-            ["alpha", "gamma", "x_star", "y_star", "k", "eps_h0", "eps_l0"],
+            [
+                "alpha",
+                "gamma",
+                "x_star",
+                "y_star",
+                "k",
+                "sigma_h",
+                "sigma_l",
+                "eps_h0",
+                "eps_l0",
+            ],
         )
     )
 
