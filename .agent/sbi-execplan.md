@@ -16,6 +16,9 @@ The goal is to let a user infer predator-prey model parameters from the historic
 - [x] (2026-01-03 06:31Z) Implemented data loading, Lotka-Volterra simulator, log-noise observation model, and simulation CLI/config.
 - [x] (2026-01-04 18:53Z) Implemented neural SBI inference pipeline and ran it on Lynx-Hare data.
 - [x] (2026-01-04 19:02Z) Added diagnostics (posterior predictive + SBC) and validated with a full diagnostics run.
+- [x] (2026-01-05 12:35Z) Reparameterized LV and anchored initial conditions, adding shared parameter-resolution helpers and updating configs/defaults.
+- [x] (2026-01-05 12:45Z) Ran inference + diagnostics with reparameterized posterior; recorded RMSE and SBC results for comparison.
+- [x] (2026-01-05 12:55Z) Updated diagnostics loader to accept reparameterized posterior samples.
 
 ## Surprises & Discoveries
 
@@ -31,6 +34,10 @@ The goal is to let a user infer predator-prey model parameters from the historic
   Evidence: diagnostics_metrics.json in runs/2026-01-04_190213.
 - Observation: Adding inferred initial conditions (hare0/lynx0) and richer summaries did not reduce RMSE in the first trial (hare ~58, lynx ~32).
   Evidence: diagnostics_metrics.json in runs/2026-01-04_211553.
+- Observation: Diagnostics initially failed on reparameterized posterior samples because the loader required beta/delta keys.
+  Evidence: ValueError "Posterior samples missing keys: ['beta', 'delta']" when running diagnostics on runs/2026-01-05_123432.
+- Observation: Reparameterized LV with anchored initial conditions did not improve RMSE in the first run (hare ~50.5, lynx ~23.7).
+  Evidence: diagnostics_metrics.json in runs/2026-01-05_123555.
 
 ## Decision Log
 
@@ -46,13 +53,16 @@ The goal is to let a user infer predator-prey model parameters from the historic
 - Decision: Set HOME and MPLCONFIGDIR to repo-local writable directories when running SBI tools to avoid arviz and matplotlib cache permission errors.
   Rationale: sbi imports arviz, which writes to Path.home(); ensuring a writable HOME prevents failures in the sandboxed environment.
   Date/Author: 2026-01-04, Codex
+- Decision: Reparameterize Lotka-Volterra using (alpha, gamma, x_star, y_star) and derive beta=alpha/y_star and delta=gamma/x_star; anchor initial conditions via eps_h0/eps_l0 around the first observation.
+  Rationale: This reduces identifiability issues and keeps initial conditions from absorbing dynamics mismatch while still allowing modest adjustments.
+  Date/Author: 2026-01-05, Codex
 - Decision: Assume the second column in data/LynxHare.txt is the prey (hare) series and the third column is the predator (lynx) series, with units treated as relative counts.
   Rationale: This is the common ordering for the lynx-hare dataset; the plan remains flexible if a different ordering is confirmed.
   Date/Author: 2026-01-02, Codex
 
 ## Outcomes & Retrospective
 
-Work has not started yet. The initial ExecPlan defines scope, milestones, and acceptance criteria.
+Milestones 1–4 are implemented and verified with inference + diagnostics runs. The first RMSE-improvement experiment (reparameterized LV with anchored initial conditions) produced similar RMSE to the baseline, suggesting the next improvements should target model mismatch (logistic prey growth or noise inference) or more informative summaries.
 
 ## Context and Orientation
 
@@ -203,3 +213,5 @@ Change Note: 2026-01-04 17:35Z — Marked Milestone 2 complete, documented arviz
 Change Note: 2026-01-04 18:53Z — Completed Milestone 3 by adding the inference pipeline, config wiring, and runtime helpers, and validated it with a successful inference run.
 Change Note: 2026-01-04 19:02Z — Implemented diagnostics, added SBC and posterior predictive checks, and validated with a full diagnostics run.
 Change Note: 2026-01-05 11:24Z — Added a ranked list of RMSE-improvement options (model extensions, noise, initial conditions, simulation budget, summary refinement) and recorded that initial-condition inference did not reduce RMSE in the first trial.
+Change Note: 2026-01-05 11:24Z — Added a decision to reparameterize LV using (alpha, gamma, x_star, y_star) and anchor initial conditions via epsilons around the first observation.
+Change Note: 2026-01-05 12:55Z — Recorded reparameterization experiment results, diagnostics loader fix, and updated progress/outcomes to reflect current state.
