@@ -1,0 +1,8 @@
+# Experiment: Linear predation (baseline model) but tau_damp parameterization + process noise.
+
+inference:
+  k_parameterization: tau_damp
+  include_holling: false
+  include_process_noise: true
+  prior:
+    log_sigma_p: [-6.907755278982137, -2.120263536200091]

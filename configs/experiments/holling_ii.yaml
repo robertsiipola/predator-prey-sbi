@@ -1,0 +1,8 @@
+# Experiment: enable Holling type-II functional response with process noise.
+
+inference:
+  include_holling: true
+  include_process_noise: true
+  # Use the tighter (previously better) sigma_p upper bound: log(0.12)
+  prior:
+    log_sigma_p: [-6.907755278982137, -2.120263536200091]

@@ -1,0 +1,8 @@
+# Experiment: add per-species observation scaling (catchability) with process noise.
+
+inference:
+  include_observation_scale: true
+  include_process_noise: true
+  prior:
+    # Keep sigma_p in the tighter range (log(1e-3), log(0.12))
+    log_sigma_p: [-6.907755278982137, -2.120263536200091]

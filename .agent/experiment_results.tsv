@@ -1,0 +1,4 @@
+config	posterior	diagnostics	rmse_hare	rmse_lynx
+configs/base.yaml	runs/2026-01-09_174932/posterior_samples.npz	runs/2026-01-09_174934/diagnostics_metrics.json	36.30079038864603	19.169100822761724
+configs/experiments/base_log.yaml	runs/2026-01-09_175144/posterior_samples.npz	runs/2026-01-09_175145/diagnostics_metrics.json	36.19416005297872	19.667824859132878
+configs/experiments/base_4k.yaml	runs/2026-01-09_175538/posterior_samples.npz	runs/2026-01-09_175540/diagnostics_metrics.json	35.7755712022728	19.87164514053703

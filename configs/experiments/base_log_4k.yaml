@@ -1,0 +1,5 @@
+# Experiment: log-transform embedding inputs + 4k simulations.
+
+inference:
+  embedding_transform: log
+  num_simulations: 4000

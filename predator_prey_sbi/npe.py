@@ -11,6 +11,8 @@ from predator_prey_sbi.parameters import (
     resolve_initial_conditions,
     resolve_lv_params,
     resolve_noise_scales,
+    resolve_observation_scales,
+    resolve_process_noise_scale,
 )
 from predator_prey_sbi.types import PosteriorLike
 from predator_prey_sbi.simulator import simulate_lv
@@ -41,8 +43,12 @@ def build_simulator(
     x0: tuple[float, float],
     dt: float,
     noise_scale: float,
+    process_noise_scale: float,
     parameter_order: list[str],
     feature_mode: str = "summary",
+    observation_operator: str = "point",
+    observation_substeps: int = 10,
+    embedding_transform: str = "log1p",
 ) -> Simulator:
     mode = feature_mode.lower()
 
@@ -56,16 +62,24 @@ def build_simulator(
         params = resolve_lv_params(values)
         sim_x0 = resolve_initial_conditions(values, x0)
         sim_noise = resolve_noise_scales(values, noise_scale)
+        sim_process_noise = resolve_process_noise_scale(values, process_noise_scale)
+        sim_obs_scale = resolve_observation_scales(values)
         hare_sim, lynx_sim = simulate_lv(
             years=years,
             params=params,
             x0=sim_x0,
             dt=dt,
             noise_scale=sim_noise,
+            process_noise_scale=sim_process_noise,
             rng_seed=None,
+            observation_scale=sim_obs_scale,
+            observation_operator=observation_operator,
+            observation_substeps=observation_substeps,
         )
         if mode == "embedding":
-            features = build_embedding_input(hare_sim, lynx_sim)
+            features = build_embedding_input(
+                hare_sim, lynx_sim, transform=embedding_transform
+            )
         else:
             features = np.asarray(
                 summarize_series(hare_sim, lynx_sim), dtype=np.float32

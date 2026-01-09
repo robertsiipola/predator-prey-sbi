@@ -1,0 +1,8 @@
+# Experiment: observation scaling + tau_damp parameterization + process noise.
+
+inference:
+  include_observation_scale: true
+  include_process_noise: true
+  k_parameterization: tau_damp
+  prior:
+    log_sigma_p: [-6.907755278982137, -2.120263536200091]

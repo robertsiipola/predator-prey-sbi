@@ -5,21 +5,29 @@ from typing import Mapping
 
 
 def resolve_lv_params(values: Mapping[str, float]) -> dict[str, float]:
-    if {"log_T", "log_r", "log_x_eq", "log_y_eq", "log_k_ratio"}.issubset(values):
+    if {"log_T", "log_r", "log_x_eq", "log_y_eq"}.issubset(values) and (
+        "log_k_ratio" in values or "log_tau_damp" in values
+    ):
         log_t = float(values["log_T"])
         log_r = float(values["log_r"])
         log_x_eq = float(values["log_x_eq"])
         log_y_eq = float(values["log_y_eq"])
-        log_k_ratio = float(values["log_k_ratio"])
 
         t = math.exp(log_t)
         r = math.exp(log_r)
         x_eq = math.exp(log_x_eq)
         y_eq = math.exp(log_y_eq)
-        k_ratio = math.exp(log_k_ratio)
 
         if t <= 0 or r <= 0 or x_eq <= 0 or y_eq <= 0:
             raise ValueError("Structure-aware parameters must be positive")
+
+        if "log_tau_damp" in values:
+            tau_damp = math.exp(float(values["log_tau_damp"]))
+            if tau_damp <= 0:
+                raise ValueError("tau_damp must be positive")
+            k_ratio = tau_damp * math.pi * r / t
+        else:
+            k_ratio = math.exp(float(values["log_k_ratio"]))
         if k_ratio <= 1.0:
             raise ValueError("k_ratio must be greater than 1 to keep K > x_eq")
 
@@ -74,6 +82,16 @@ def resolve_lv_params(values: Mapping[str, float]) -> dict[str, float]:
     }
     if k is not None:
         params["k"] = k
+    if "log_h" in values:
+        h = math.exp(float(values["log_h"]))
+        if h <= 0:
+            raise ValueError("h must be positive")
+        params["h"] = h
+    elif "h" in values:
+        h = float(values["h"])
+        if h <= 0:
+            raise ValueError("h must be positive")
+        params["h"] = h
     return params
 
 
@@ -98,6 +116,46 @@ def resolve_noise_scales(
             raise ValueError("sigma_h and sigma_l must be non-negative")
         return sigma_h, sigma_l
     return default_noise
+
+
+def resolve_process_noise_scale(
+    values: Mapping[str, float],
+    default_scale: float,
+) -> float:
+    if "log_sigma_p" in values:
+        sigma_p = math.exp(float(values["log_sigma_p"]))
+        if sigma_p < 0:
+            raise ValueError("log_sigma_p must map to non-negative values")
+        return sigma_p
+    if "sigma_p" in values:
+        sigma_p = float(values["sigma_p"])
+        if sigma_p < 0:
+            raise ValueError("sigma_p must be non-negative")
+        return sigma_p
+    return float(default_scale)
+
+
+def resolve_observation_scales(
+    values: Mapping[str, float],
+    default_scales: tuple[float, float] = (1.0, 1.0),
+) -> tuple[float, float]:
+    if "log_c_h" in values or "log_c_l" in values:
+        if "log_c_h" not in values or "log_c_l" not in values:
+            raise ValueError("Both log_c_h and log_c_l are required")
+        c_h = math.exp(float(values["log_c_h"]))
+        c_l = math.exp(float(values["log_c_l"]))
+        if c_h <= 0 or c_l <= 0:
+            raise ValueError("log_c_h/log_c_l must map to positive values")
+        return c_h, c_l
+    if "c_h" in values or "c_l" in values:
+        if "c_h" not in values or "c_l" not in values:
+            raise ValueError("Both c_h and c_l are required")
+        c_h = float(values["c_h"])
+        c_l = float(values["c_l"])
+        if c_h <= 0 or c_l <= 0:
+            raise ValueError("c_h and c_l must be positive")
+        return c_h, c_l
+    return default_scales
 
 
 def resolve_initial_conditions(

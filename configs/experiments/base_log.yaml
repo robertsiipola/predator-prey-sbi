@@ -1,0 +1,4 @@
+# Experiment: same as base, but use log-transform inputs for embedding (instead of log1p).
+
+inference:
+  embedding_transform: log

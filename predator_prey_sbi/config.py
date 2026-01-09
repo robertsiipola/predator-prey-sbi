@@ -15,6 +15,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
     },
     "noise_scale": 0.1,
     "dt": 0.1,
+    "observation_operator": "point",
+    "observation_substeps": 10,
     "use_observed_initial": True,
     "x0": [10.0, 10.0],
     "plot": {
@@ -27,9 +29,14 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "num_workers": 1,
         "seed": 0,
         "noise_scale": 0.0,
+        "process_noise_scale": 0.0,
         "sample_with": "rejection",
         "mcmc_method": "slice_np",
         "prior_scheme": "structure_aware",
+        "k_parameterization": "k_ratio",
+        "include_process_noise": False,
+        "include_holling": False,
+        "include_observation_scale": False,
         "feature_mode": "embedding",
         "embedding": {
             "model": "nsf",
@@ -42,6 +49,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "embedding_dim": 32,
             "kernel_size": 5,
         },
+        "embedding_transform": "log1p",
         "parameter_order": [
             "log_T",
             "log_r",
@@ -58,7 +66,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "log_r": [-0.35667494393873245, 0.3364722366212129],
             "log_x_eq": [3.202014467792789, 4.182843720804516],
             "log_y_eq": [2.8766108426461274, 3.857440095657854],
-            "log_k_ratio": [0.1823215567939546, 1.5040773967762742],
+            "log_k_ratio": [0.6931471805599453, 3.4011973816621555],
             "eps_h0": [-0.15, 0.15],
             "eps_l0": [-0.15, 0.15],
             "log_sigma_h": [-2.995732273553991, -1.2039728043259361],
@@ -69,6 +77,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "posterior_draws": 300,
         "seed": 0,
         "noise_scale": 0.0,
+        "process_noise_scale": 0.0,
         "sbc": {
             "num_simulations": 500,
             "num_datasets": 20,
