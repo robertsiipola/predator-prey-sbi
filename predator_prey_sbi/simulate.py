@@ -72,6 +72,8 @@ def run_simulation(config_path: str) -> Path:
     noise_scale = float(config["noise_scale"])
     dt = float(config["dt"])
     rng_seed = config.get("rng_seed")
+    observation_operator = str(config.get("observation_operator", "point"))
+    observation_substeps = int(config.get("observation_substeps", 10))
 
     hare_sim, lynx_sim = simulate_lv(
         years=years,
@@ -80,6 +82,8 @@ def run_simulation(config_path: str) -> Path:
         dt=dt,
         noise_scale=noise_scale,
         rng_seed=rng_seed,
+        observation_operator=observation_operator,
+        observation_substeps=observation_substeps,
     )
 
     run_dir = _make_run_dir(str(config.get("output_dir", "runs")))

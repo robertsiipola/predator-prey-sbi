@@ -1,0 +1,8 @@
+# Experiment: Holling type-II + observation scaling + process noise.
+
+inference:
+  include_holling: true
+  include_observation_scale: true
+  include_process_noise: true
+  prior:
+    log_sigma_p: [-6.907755278982137, -2.120263536200091]

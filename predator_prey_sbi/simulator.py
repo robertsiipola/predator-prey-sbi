@@ -11,12 +11,22 @@ def simulate_lv(
     dt: float,
     noise_scale: float | tuple[float, float],
     rng_seed: int | None,
+    process_noise_scale: float = 0.0,
+    observation_scale: tuple[float, float] = (1.0, 1.0),
+    observation_operator: str = "point",
+    observation_substeps: int = 10,
 ) -> tuple[list[float], list[float]]:
     """Simulate prey/predator series with Lotka-Volterra ODE and log-normal observation noise."""
     if dt <= 0:
         raise ValueError("dt must be positive")
     if len(years) < 2:
         raise ValueError("years must contain at least two entries")
+    if observation_substeps <= 0:
+        raise ValueError("observation_substeps must be positive")
+    if process_noise_scale < 0:
+        raise ValueError("process_noise_scale must be non-negative")
+    if observation_scale[0] <= 0 or observation_scale[1] <= 0:
+        raise ValueError("observation_scale values must be positive")
 
     years_array = np.asarray(years, dtype=float)
     if not np.all(np.diff(years_array) > 0):
@@ -28,33 +38,113 @@ def simulate_lv(
     delta = params["delta"]
     gamma = params["gamma"]
     k = params.get("k")
+    h = params.get("h")
     if k is not None and k <= 0:
         raise ValueError("k (carrying capacity) must be positive")
+    if h is not None and h <= 0:
+        raise ValueError("h (handling time) must be positive")
 
     def dynamics(_: float, state: np.ndarray) -> np.ndarray:
         prey, predator = state
-        if k is None:
-            d_prey = alpha * prey - beta * prey * predator
+        if h is None:
+            predation = prey * predator
         else:
-            d_prey = alpha * prey * (1.0 - prey / k) - beta * prey * predator
-        d_predator = delta * prey * predator - gamma * predator
+            predation = (prey * predator) / (1.0 + h * prey)
+        prey_loss = beta * predation
+        predator_gain = delta * predation
+        if k is None:
+            d_prey = alpha * prey - prey_loss
+        else:
+            d_prey = alpha * prey * (1.0 - prey / k) - prey_loss
+        d_predator = predator_gain - gamma * predator
         return np.array([d_prey, d_predator], dtype=float)
+
+    op = observation_operator.strip().lower()
+    if process_noise_scale > 0:
+        rng = np.random.default_rng(rng_seed)
+        prey, predator = _simulate_with_process_noise(
+            t_eval=t_eval,
+            x0=x0,
+            dt=dt,
+            process_noise_scale=process_noise_scale,
+            rng=rng,
+            alpha=alpha,
+            beta=beta,
+            delta=delta,
+            gamma=gamma,
+            k=k,
+            h=h,
+            observation_operator=op,
+            observation_substeps=observation_substeps,
+        )
+        prey = prey * float(observation_scale[0])
+        predator = predator * float(observation_scale[1])
+        noise = _normalize_noise_scale(noise_scale)
+        if noise is not None:
+            prey = _apply_log_noise(prey, noise[0], rng)
+            predator = _apply_log_noise(predator, noise[1], rng)
+        return prey.tolist(), predator.tolist()
+
+    if op in {"point", "points"}:
+        t_end = float(t_eval[-1])
+        sample_times = t_eval
+        needs_dense = False
+    elif op in {"midpoint", "mid_year", "midyear"}:
+        t_end = float(t_eval[-1] + 0.5)
+        sample_times = t_eval + 0.5
+        needs_dense = False
+    elif op in {"annual_mean", "annual_average", "year_mean", "year_average"}:
+        diffs = np.diff(t_eval)
+        step = float(diffs[0])
+        if not np.allclose(diffs, step, rtol=0.0, atol=1e-9):
+            raise ValueError("annual_mean observation requires evenly spaced years")
+        t_end = float(t_eval[-1] + step)
+        sample_times = None
+        needs_dense = True
+    else:
+        raise ValueError(
+            "observation_operator must be one of: point, midpoint, annual_mean; got: "
+            f"{observation_operator!r}"
+        )
 
     solver = solve_ivp(
         dynamics,
-        (t_eval[0], t_eval[-1]),
+        (float(t_eval[0]), t_end),
         np.array([x0[0], x0[1]], dtype=float),
-        t_eval=t_eval,
+        t_eval=sample_times,
         max_step=dt,
         rtol=1e-6,
         atol=1e-8,
+        dense_output=needs_dense,
     )
 
     if not solver.success:
         raise RuntimeError(f"Simulation failed: {solver.message}")
 
-    prey = solver.y[0]
-    predator = solver.y[1]
+    if op in {"annual_mean", "annual_average", "year_mean", "year_average"}:
+        if solver.sol is None:
+            raise RuntimeError("Dense output required but solver.sol is missing")
+        diffs = np.diff(t_eval)
+        step = float(diffs[0])
+        offsets = (np.arange(observation_substeps, dtype=float) + 0.5) / float(
+            observation_substeps
+        )
+        sample_grid = offsets * step
+        prey_vals = np.empty(t_eval.shape[0], dtype=float)
+        predator_vals = np.empty(t_eval.shape[0], dtype=float)
+        for idx, t0 in enumerate(t_eval):
+            times = t0 + sample_grid
+            values = solver.sol(times)
+            prey_vals[idx] = float(np.mean(values[0]))
+            predator_vals[idx] = float(np.mean(values[1]))
+        prey = prey_vals
+        predator = predator_vals
+    else:
+        prey = solver.y[0]
+        predator = solver.y[1]
+
+    prey = prey * float(observation_scale[0])
+    predator = predator * float(observation_scale[1])
 
     noise = _normalize_noise_scale(noise_scale)
     if noise is not None:
@@ -63,6 +153,138 @@ def simulate_lv(
         predator = _apply_log_noise(predator, noise[1], rng)
 
     return prey.tolist(), predator.tolist()
+
+
+def _simulate_with_process_noise(
+    t_eval: np.ndarray,
+    x0: tuple[float, float],
+    dt: float,
+    process_noise_scale: float,
+    rng: np.random.Generator,
+    alpha: float,
+    beta: float,
+    delta: float,
+    gamma: float,
+    k: float | None,
+    h: float | None,
+    observation_operator: str,
+    observation_substeps: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    diffs = np.diff(t_eval)
+    if diffs.size == 0:
+        raise ValueError("years must contain at least two entries")
+
+    def deriv(prey: float, predator: float) -> tuple[float, float]:
+        if h is None:
+            predation = prey * predator
+        else:
+            predation = (prey * predator) / (1.0 + h * prey)
+        prey_loss = beta * predation
+        predator_gain = delta * predation
+        if k is None:
+            d_prey = alpha * prey - prey_loss
+        else:
+            d_prey = alpha * prey * (1.0 - prey / k) - prey_loss
+        d_pred = predator_gain - gamma * predator
+        return d_prey, d_pred
+
+    def integrate(
+        t: float,
+        prey: float,
+        predator: float,
+        t_target: float,
+    ) -> tuple[float, float, float]:
+        while t < t_target:
+            h = min(dt, t_target - t)
+            k1x, k1y = deriv(prey, predator)
+            k2x, k2y = deriv(prey + 0.5 * h * k1x, predator + 0.5 * h * k1y)
+            k3x, k3y = deriv(prey + 0.5 * h * k2x, predator + 0.5 * h * k2y)
+            k4x, k4y = deriv(prey + h * k3x, predator + h * k3y)
+            prey = prey + (h / 6.0) * (k1x + 2.0 * k2x + 2.0 * k3x + k4x)
+            predator = predator + (h / 6.0) * (k1y + 2.0 * k2y + 2.0 * k3y + k4y)
+            t = t + h
+            if not (np.isfinite(prey) and np.isfinite(predator)):
+                raise RuntimeError("Simulation diverged (non-finite state)")
+        return t, prey, predator
+
+    op = observation_operator
+    if op in {"midpoint", "mid_year", "midyear", "annual_mean", "annual_average"}:
+        step = float(diffs[0])
+        if not np.allclose(diffs, step, rtol=0.0, atol=1e-9):
+            raise ValueError(
+                "process noise simulation requires evenly spaced years for midpoint/annual_mean"
+            )
+
+    n = t_eval.shape[0]
+    prey_out = np.empty(n, dtype=float)
+    predator_out = np.empty(n, dtype=float)
+
+    t = float(t_eval[0])
+    prey = float(x0[0])
+    predator = float(x0[1])
+
+    if op in {"point", "points"}:
+        prey_out[0] = prey
+        predator_out[0] = predator
+        for idx in range(n - 1):
+            t_next = float(t_eval[idx + 1])
+            dt_year = float(t_next - t)
+            t, prey, predator = integrate(t, prey, predator, t_next)
+            scale = process_noise_scale * float(np.sqrt(max(dt_year, 0.0)))
+            prey = max(prey, 1e-9) * float(np.exp(rng.normal(0.0, scale)))
+            predator = max(predator, 1e-9) * float(np.exp(rng.normal(0.0, scale)))
+            prey_out[idx + 1] = prey
+            predator_out[idx + 1] = predator
+        return prey_out, predator_out
+
+    if op in {"midpoint", "mid_year", "midyear"}:
+        step = float(diffs[0])
+        for idx in range(n):
+            mid = float(t_eval[idx] + 0.5 * step)
+            t, prey, predator = integrate(t, prey, predator, mid)
+            prey_out[idx] = prey
+            predator_out[idx] = predator
+            if idx == n - 1:
+                break
+            boundary = float(t_eval[idx + 1])
+            t, prey, predator = integrate(t, prey, predator, boundary)
+            scale = process_noise_scale * float(np.sqrt(max(step, 0.0)))
+            prey = max(prey, 1e-9) * float(np.exp(rng.normal(0.0, scale)))
+            predator = max(predator, 1e-9) * float(np.exp(rng.normal(0.0, scale)))
+        return prey_out, predator_out
+
+    if op in {"annual_mean", "annual_average", "year_mean", "year_average"}:
+        step = float(diffs[0])
+        offsets = (np.arange(observation_substeps, dtype=float) + 0.5) / float(
+            observation_substeps
+        )
+        for idx in range(n):
+            start = float(t_eval[idx])
+            if t < start:
+                t, prey, predator = integrate(t, prey, predator, start)
+            samples_p = []
+            samples_q = []
+            for frac in offsets:
+                ts = start + float(frac) * step
+                t, prey, predator = integrate(t, prey, predator, ts)
+                samples_p.append(prey)
+                samples_q.append(predator)
+            prey_out[idx] = float(np.mean(samples_p))
+            predator_out[idx] = float(np.mean(samples_q))
+
+            end = start + step
+            t, prey, predator = integrate(t, prey, predator, end)
+            if idx == n - 1:
+                break
+            scale = process_noise_scale * float(np.sqrt(max(step, 0.0)))
+            prey = max(prey, 1e-9) * float(np.exp(rng.normal(0.0, scale)))
+            predator = max(predator, 1e-9) * float(np.exp(rng.normal(0.0, scale)))
+        return prey_out, predator_out
+
+    raise ValueError(
+        "observation_operator must be one of: point, midpoint, annual_mean; got: "
+        f"{observation_operator!r}"
+    )
 
 
 def _apply_log_noise(

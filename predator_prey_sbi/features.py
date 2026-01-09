@@ -6,6 +6,16 @@ from typing import Iterable
 import numpy as np
 
 
+def _log_transform(series: np.ndarray, transform: str) -> np.ndarray:
+    mode = transform.strip().lower()
+    safe = np.clip(series, 1e-9, None)
+    if mode == "log":
+        return np.log(safe)
+    if mode == "log1p":
+        return np.log1p(np.clip(series, 0.0, None))
+    raise ValueError(f"Unknown transform: {transform!r} (expected 'log1p' or 'log')")
+
+
 def summarize_series(hare: Iterable[float], lynx: Iterable[float]) -> list[float]:
     """Compute summary statistics used as inputs to the neural posterior estimator."""
     hare_arr = np.asarray(list(hare), dtype=float)
@@ -14,8 +24,8 @@ def summarize_series(hare: Iterable[float], lynx: Iterable[float]) -> list[float
     if hare_arr.size < 2 or lynx_arr.size < 2:
         raise ValueError("Hare and lynx series must have at least two observations")
 
-    hare_log = np.log1p(np.clip(hare_arr, 0.0, None))
-    lynx_log = np.log1p(np.clip(lynx_arr, 0.0, None))
+    hare_log = _log_transform(hare_arr, "log1p")
+    lynx_log = _log_transform(lynx_arr, "log1p")
 
     hare_stats = _basic_stats(hare_log)
     lynx_stats = _basic_stats(lynx_log)
@@ -53,14 +63,18 @@ def summarize_series(hare: Iterable[float], lynx: Iterable[float]) -> list[float
     ]
 
 
-def build_embedding_input(hare: Iterable[float], lynx: Iterable[float]) -> np.ndarray:
+def build_embedding_input(
+    hare: Iterable[float],
+    lynx: Iterable[float],
+    transform: str = "log1p",
+) -> np.ndarray:
     hare_arr = np.asarray(list(hare), dtype=float)
     lynx_arr = np.asarray(list(lynx), dtype=float)
     if hare_arr.size < 2 or lynx_arr.size < 2:
         raise ValueError("Hare and lynx series must have at least two observations")
 
-    hare_log = np.log1p(np.clip(hare_arr, 0.0, None))
-    lynx_log = np.log1p(np.clip(lynx_arr, 0.0, None))
+    hare_log = _log_transform(hare_arr, transform)
+    lynx_log = _log_transform(lynx_arr, transform)
     hare_diff = np.concatenate(([0.0], np.diff(hare_log)))
     lynx_diff = np.concatenate(([0.0], np.diff(lynx_log)))
     return np.stack([hare_log, lynx_log, hare_diff, lynx_diff], axis=0).astype(

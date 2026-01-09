@@ -17,6 +17,8 @@ from predator_prey_sbi.parameters import (
     resolve_initial_conditions,
     resolve_lv_params,
     resolve_noise_scales,
+    resolve_observation_scales,
+    resolve_process_noise_scale,
 )
 from predator_prey_sbi.priors import build_structure_aware_prior
 from predator_prey_sbi.runtime import configure_runtime
@@ -35,26 +37,28 @@ def _load_posterior_samples(path: str) -> dict[str, np.ndarray]:
     samples = {key: data[key] for key in data.files}
     base_required = {"alpha", "beta", "delta", "gamma"}
     reparam_required = {"alpha", "gamma", "x_star", "y_star"}
-    structure_required = {
-        "log_T",
-        "log_r",
-        "log_x_eq",
-        "log_y_eq",
-        "log_k_ratio",
-    }
+    structure_base = {"log_T", "log_r", "log_x_eq", "log_y_eq"}
+    structure_required_a = structure_base | {"log_k_ratio"}
+    structure_required_b = structure_base | {"log_tau_damp"}
     if (
         base_required.issubset(samples)
         or reparam_required.issubset(samples)
-        or structure_required.issubset(samples)
+        or structure_required_a.issubset(samples)
+        or structure_required_b.issubset(samples)
     ):
         return samples
     missing_base = sorted(base_required.difference(samples))
     missing_reparam = sorted(reparam_required.difference(samples))
-    missing_structure = sorted(structure_required.difference(samples))
+    missing_structure_a = sorted(structure_required_a.difference(samples))
+    missing_structure_b = sorted(structure_required_b.difference(samples))
     raise ValueError(
         "Posterior samples missing keys for either parameterization. "
-        "Base missing: {base}; reparam missing: {reparam}; structure missing: {structure}".format(
-            base=missing_base, reparam=missing_reparam, structure=missing_structure
+        "Base missing: {base}; reparam missing: {reparam}; "
+        "structure(k_ratio) missing: {structure_a}; structure(tau_damp) missing: {structure_b}".format(
+            base=missing_base,
+            reparam=missing_reparam,
+            structure_a=missing_structure_a,
+            structure_b=missing_structure_b,
         )
     )
     return samples
@@ -86,11 +90,15 @@ def posterior_predictive(
     x0: tuple[float, float],
     dt: float,
     noise_scale: float,
+    process_noise_scale: float,
     n_draws: int,
     seed: int | None,
+    observation_operator: str,
+    observation_substeps: int,
     output_dir: Path,
 ) -> dict[str, float | str]:
     params_list = _sample_posterior_params(posterior_samples, n_draws, seed)
+    noise_seed_rng = np.random.default_rng(seed)
 
     hare_obs, lynx_obs = obs
     hare_sims = []
@@ -101,13 +109,19 @@ def posterior_predictive(
     for params in params_list:
         sim_x0 = resolve_initial_conditions(params, x0)
         sim_noise = resolve_noise_scales(params, noise_scale)
+        sim_process_noise = resolve_process_noise_scale(params, process_noise_scale)
+        sim_obs_scale = resolve_observation_scales(params)
         hare_sim, lynx_sim = simulate_lv(
             years=years,
             params=resolve_lv_params(params),
             x0=sim_x0,
             dt=dt,
             noise_scale=sim_noise,
-            rng_seed=None,
+            process_noise_scale=sim_process_noise,
+            rng_seed=int(noise_seed_rng.integers(0, 2**32 - 1)),
+            observation_scale=sim_obs_scale,
+            observation_operator=observation_operator,
+            observation_substeps=observation_substeps,
         )
         hare_sims.append(hare_sim)
         lynx_sims.append(lynx_sim)
@@ -118,18 +132,29 @@ def posterior_predictive(
     hare_q05, hare_q50, hare_q95 = np.percentile(hare_arr, [5, 50, 95], axis=0)
     lynx_q05, lynx_q50, lynx_q95 = np.percentile(lynx_arr, [5, 50, 95], axis=0)
 
-    hare_rmse = float(np.sqrt(np.mean((hare_q50 - np.asarray(hare_obs)) ** 2)))
-    lynx_rmse = float(np.sqrt(np.mean((lynx_q50 - np.asarray(lynx_obs)) ** 2)))
+    hare_mean = np.mean(hare_arr, axis=0)
+    lynx_mean = np.mean(lynx_arr, axis=0)
+
+    hare_rmse_mean = float(np.sqrt(np.mean((hare_mean - np.asarray(hare_obs)) ** 2)))
+    lynx_rmse_mean = float(np.sqrt(np.mean((lynx_mean - np.asarray(lynx_obs)) ** 2)))
+    hare_rmse_median = float(np.sqrt(np.mean((hare_q50 - np.asarray(hare_obs)) ** 2)))
+    lynx_rmse_median = float(np.sqrt(np.mean((lynx_q50 - np.asarray(lynx_obs)) ** 2)))
 
     fig, axes = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
     axes[0].fill_between(years, hare_q05, hare_q95, color="tab:blue", alpha=0.2)
     axes[0].plot(years, hare_q50, color="tab:blue", label="Posterior median")
+    axes[0].plot(
+        years, hare_mean, color="tab:blue", linestyle=":", label="Posterior mean"
+    )
     axes[0].plot(years, hare_obs, color="tab:blue", linestyle="--", label="Observed")
     axes[0].set_ylabel("Hare")
     axes[0].legend(loc="upper right")
 
     axes[1].fill_between(years, lynx_q05, lynx_q95, color="tab:orange", alpha=0.2)
     axes[1].plot(years, lynx_q50, color="tab:orange", label="Posterior median")
+    axes[1].plot(
+        years, lynx_mean, color="tab:orange", linestyle=":", label="Posterior mean"
+    )
     axes[1].plot(years, lynx_obs, color="tab:orange", linestyle="--", label="Observed")
     axes[1].set_ylabel("Lynx")
     axes[1].set_xlabel("Year")
@@ -144,8 +169,10 @@ def posterior_predictive(
     plt.close(fig)
 
     return {
-        "posterior_predictive_hare_rmse": hare_rmse,
-        "posterior_predictive_lynx_rmse": lynx_rmse,
+        "posterior_predictive_hare_rmse": hare_rmse_mean,
+        "posterior_predictive_lynx_rmse": lynx_rmse_mean,
+        "posterior_predictive_hare_rmse_median": hare_rmse_median,
+        "posterior_predictive_lynx_rmse_median": lynx_rmse_median,
         "posterior_predictive_plot": str(plot_path),
     }
 
@@ -251,8 +278,16 @@ def diagnostics_from_file(
             x0 = (float(x0_values[0]), float(x0_values[1]))
 
         dt = float(config.get("dt", 0.1))
+        observation_operator = str(config.get("observation_operator", "point"))
+        observation_substeps = int(config.get("observation_substeps", 10))
         n_draws = int(diagnostics_cfg.get("posterior_draws", 200))
         noise_scale = float(diagnostics_cfg.get("noise_scale", 0.0))
+        process_noise_scale = float(
+            diagnostics_cfg.get(
+                "process_noise_scale",
+                config.get("inference", {}).get("process_noise_scale", 0.0),
+            )
+        )
         seed = diagnostics_cfg.get("seed", 0)
 
         metrics.update(
@@ -263,8 +298,11 @@ def diagnostics_from_file(
                 x0=x0,
                 dt=dt,
                 noise_scale=noise_scale,
+                process_noise_scale=process_noise_scale,
                 n_draws=n_draws,
                 seed=seed,
+                observation_operator=observation_operator,
+                observation_substeps=observation_substeps,
                 output_dir=run_dir,
             )
         )
@@ -291,7 +329,14 @@ def diagnostics_from_file(
     embedding_cfg = (
         inference_cfg.get("embedding", {}) if isinstance(inference_cfg, dict) else {}
     )
+    embedding_transform = str(inference_cfg.get("embedding_transform", "log1p"))
     prior_scheme = str(inference_cfg.get("prior_scheme", "default"))
+    k_parameterization = str(inference_cfg.get("k_parameterization", "k_ratio"))
+    include_process_noise = bool(inference_cfg.get("include_process_noise", False))
+    include_holling = bool(inference_cfg.get("include_holling", False))
+    include_observation_scale = bool(
+        inference_cfg.get("include_observation_scale", False)
+    )
     parameter_order = list(
         inference_cfg.get(
             "parameter_order",
@@ -317,18 +362,39 @@ def diagnostics_from_file(
         x0 = (float(x0_values[0]), float(x0_values[1]))
 
     dt = float(config.get("dt", 0.1))
+    observation_operator = str(
+        inference_cfg.get(
+            "observation_operator", config.get("observation_operator", "point")
+        )
+    )
+    observation_substeps = int(
+        inference_cfg.get(
+            "observation_substeps", config.get("observation_substeps", 10)
+        )
+    )
+    process_noise_scale = float(inference_cfg.get("process_noise_scale", 0.0))
 
     if prior_scheme == "structure_aware":
         parameter_order, prior_cfg = build_structure_aware_prior(
-            hare_obs, lynx_obs, prior_cfg
+            hare_obs,
+            lynx_obs,
+            prior_cfg,
+            k_parameterization=k_parameterization,
+            include_process_noise=include_process_noise,
+            include_holling=include_holling,
+            include_observation_scale=include_observation_scale,
         )
     simulator = build_simulator(
         years=years,
         x0=x0,
         dt=dt,
         noise_scale=float(inference_cfg.get("noise_scale", 0.0)),
+        process_noise_scale=process_noise_scale,
         parameter_order=parameter_order,
         feature_mode=feature_mode,
+        observation_operator=observation_operator,
+        observation_substeps=observation_substeps,
+        embedding_transform=embedding_transform,
     )
     prior_low, prior_high = build_prior(prior_cfg, parameter_order)
 

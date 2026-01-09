@@ -41,7 +41,14 @@ def infer_from_file(config_path: str, observed_path: str) -> str:
     embedding_cfg = (
         inference_cfg.get("embedding", {}) if isinstance(inference_cfg, dict) else {}
     )
+    embedding_transform = str(inference_cfg.get("embedding_transform", "log1p"))
     prior_scheme = str(inference_cfg.get("prior_scheme", "default"))
+    k_parameterization = str(inference_cfg.get("k_parameterization", "k_ratio"))
+    include_process_noise = bool(inference_cfg.get("include_process_noise", False))
+    include_holling = bool(inference_cfg.get("include_holling", False))
+    include_observation_scale = bool(
+        inference_cfg.get("include_observation_scale", False)
+    )
     parameter_order = list(
         inference_cfg.get(
             "parameter_order",
@@ -67,14 +74,33 @@ def infer_from_file(config_path: str, observed_path: str) -> str:
         x0 = (float(x0_values[0]), float(x0_values[1]))
 
     dt = float(config.get("dt", 0.1))
+    observation_operator = str(
+        inference_cfg.get(
+            "observation_operator", config.get("observation_operator", "point")
+        )
+    )
+    observation_substeps = int(
+        inference_cfg.get(
+            "observation_substeps", config.get("observation_substeps", 10)
+        )
+    )
+    process_noise_scale = float(inference_cfg.get("process_noise_scale", 0.0))
 
     if prior_scheme == "structure_aware":
         parameter_order, prior_cfg = build_structure_aware_prior(
-            hare_obs, lynx_obs, prior_cfg
+            hare_obs,
+            lynx_obs,
+            prior_cfg,
+            k_parameterization=k_parameterization,
+            include_process_noise=include_process_noise,
+            include_holling=include_holling,
+            include_observation_scale=include_observation_scale,
         )
 
     if feature_mode.lower() == "embedding":
-        embedding_obs = build_embedding_input(hare_obs, lynx_obs)
+        embedding_obs = build_embedding_input(
+            hare_obs, lynx_obs, transform=embedding_transform
+        )
         x_o = torch.tensor(embedding_obs, dtype=torch.float32).unsqueeze(0)
     else:
         summary_obs = summarize_series(hare_obs, lynx_obs)
@@ -85,8 +111,12 @@ def infer_from_file(config_path: str, observed_path: str) -> str:
         x0=x0,
         dt=dt,
         noise_scale=noise_scale,
+        process_noise_scale=process_noise_scale,
         parameter_order=parameter_order,
         feature_mode=feature_mode,
+        observation_operator=observation_operator,
+        observation_substeps=observation_substeps,
+        embedding_transform=embedding_transform,
     )
 
     prior_low, prior_high = build_prior(prior_cfg, parameter_order)

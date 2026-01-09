@@ -31,6 +31,14 @@ The goal is to let a user infer predator-prey model parameters from the historic
 - [x] (2026-01-05 19:11Z) Ran inference + diagnostics with structure-aware priors; recorded RMSE and SBC results.
 - [x] (2026-01-05 19:23Z) Tightened structure-aware priors (T/r/x_eq/y_eq/k_ratio, eps, sigma) and reran inference + diagnostics; recorded RMSE and SBC results.
 - [x] (2026-01-05 19:29Z) Increased structure-aware simulation budget to 4k and reran inference + diagnostics; recorded RMSE and SBC results.
+- [x] (2026-01-09 17:31Z) Added annual-mean and midpoint observation operators, posterior predictive mean RMSE reporting, and a latent process-noise option (log_sigma_p); ran an experiment sweep and recorded results in .agent/experiment_results.tsv.
+- [x] (2026-01-09 17:33Z) Added optional Holling type-II predation and discovered/fixed a bug where predator growth mistakenly used delta*(beta*predation) instead of delta*predation.
+- [x] (2026-01-09 18:05Z) Increased simulation budget to 4k for the current best-performing baseline and achieved hare RMSE ~35.6 (lynx ~19.8) on posterior predictive mean.
+- [ ] (2026-01-09 18:57Z) Next: scale up simulation budget sweep (6k/8k/12k) for the current best config and record the RMSE vs. runtime curve.
+- [ ] (2026-01-09 18:57Z) Next: run a small grid on process noise prior upper bound (log(0.08), log(0.12), log(0.2)) while capping observation noise to avoid “noise explains everything.”
+- [ ] (2026-01-09 18:57Z) Next: evaluate posterior sampling method (rejection vs MCMC) when acceptance is low; record effect on RMSE stability and runtime.
+- [ ] (2026-01-09 18:57Z) Next: try a 2-round SNPE schedule (e.g., 2k prior + 2k (80% proposal, 20% prior)) to concentrate simulations without losing calibration.
+- [ ] (2026-01-09 18:57Z) Next: revisit observation scaling (log_c_h/log_c_l) with relaxed equilibrium priors (widen log_x_eq/log_y_eq ranges), since the current equilibrium-anchored priors may make scaling redundant.
 
 ## Surprises & Discoveries
 
@@ -66,6 +74,12 @@ The goal is to let a user infer predator-prey model parameters from the historic
   Evidence: diagnostics_metrics.json in runs/2026-01-05_192244.
 - Observation: A 4k simulation budget with tightened structure-aware priors further improved RMSE (hare ~36.5, lynx ~18.8) but still trails the best prior run.
   Evidence: diagnostics_metrics.json in runs/2026-01-05_192911.
+- Observation: Adding annual-mean observation operator and latent process noise provides small but consistent RMSE improvements; the best improvement in this round came from increasing the simulation budget to 4k.
+  Evidence: runs/2026-01-09_180528/diagnostics_metrics.json reports posterior predictive mean RMSE hare=35.587, lynx=19.797 using configs/experiments/base_4k.yaml.
+- Observation: Adding per-species observation scaling parameters (log_c_h/log_c_l) did not improve RMSE under the current structure-aware priors (x_eq/y_eq anchored to data medians).
+  Evidence: .agent/experiment_results.tsv shows worse hare RMSE for configs/experiments/linear_obs_scale.yaml vs configs/base.yaml on 2026-01-09.
+- Observation: Rejection sampling can become extremely slow when the learned posterior is narrow (very low acceptance), which can dominate experiment runtime.
+  Evidence: sbi emitted a low acceptance warning during posterior sampling in a prior sweep (warning reported ~0.6% acceptance).
 
 ## Decision Log
 
@@ -105,10 +119,21 @@ The goal is to let a user infer predator-prey model parameters from the historic
 - Decision: Assume the second column in data/LynxHare.txt is the prey (hare) series and the third column is the predator (lynx) series, with units treated as relative counts.
   Rationale: This is the common ordering for the lynx-hare dataset; the plan remains flexible if a different ordering is confirmed.
   Date/Author: 2026-01-02, Codex
+- Decision: Add a latent process noise term (sigma_p) applied once per year between ODE integration steps, and infer it as log_sigma_p.
+  Rationale: Deterministic logistic LV tends to produce overly-regular or damped oscillations; process noise can sustain variability and amplitude fluctuations that observation noise cannot.
+  Date/Author: 2026-01-09, Codex
+- Decision: Add observation operators (point, midpoint, annual_mean) for mapping continuous-time latent states to annual observations.
+  Rationale: Annual sampling can induce systematic phase mismatch; midpoint/annual averaging is a low-cost way to reduce aliasing.
+  Date/Author: 2026-01-09, Codex
+- Decision: Add optional Holling type-II predation (with inferred log_h) as a minimal structural extension beyond linear predation.
+  Rationale: Saturating predation is a common mechanism for stabilizing cycles and may better match amplitude regulation in the lynx-hare record.
+  Date/Author: 2026-01-09, Codex
 
 ## Outcomes & Retrospective
 
 Milestones 1–4 are implemented and verified with inference + diagnostics runs. Logistic prey growth (carrying capacity k) improved RMSE substantially versus the baseline. Adding inferred observation noise marginally improved lynx RMSE while keeping hare RMSE similar, while mechanistic regression summaries, the learned embedding, and the structure-aware priors (even after tightening) did not improve RMSE in the first trials; further gains likely need a larger simulation budget, alternative priors, or model/observation adjustments.
+
+As of 2026-01-09, the best observed hare RMSE in this round of experiments is ~35.6 (lynx ~19.8) using annual_mean observations, inferred latent process noise (log_sigma_p), and a 4k simulation budget. Additional structural extensions (Holling type-II) did not improve RMSE in the first sweep, and per-species observation scaling did not help under the current equilibrium-anchored priors.
 
 ## Context and Orientation
 
@@ -267,3 +292,6 @@ Change Note: 2026-01-05 15:06Z — Added mechanistic regression summaries to the
 Change Note: 2026-01-05 15:13Z — Recorded mechanistic summary experiment results (RMSE and SBC).
 Change Note: 2026-01-05 15:47Z — Added learned embedding pathway and recorded the initial embedding experiment results.
 Change Note: 2026-01-05 19:11Z — Added structure-aware parameterization/priors and recorded the initial results.
+Change Note: 2026-01-09 17:31Z — Added observation operators (point/midpoint/annual_mean), latent process noise (log_sigma_p), tau_damp/k_ratio switch, and posterior predictive mean RMSE; ran a sweep and recorded results in .agent/experiment_results.tsv.
+Change Note: 2026-01-09 17:33Z — Added optional Holling type-II predation and fixed a Holling/linear predation bug in predator growth term.
+Change Note: 2026-01-09 18:05Z — Increased simulation budget experiments to 4k and recorded the improved RMSE for configs/experiments/base_4k.yaml.

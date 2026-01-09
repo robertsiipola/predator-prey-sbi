@@ -1,0 +1,4 @@
+# Experiment: increase simulation budget to 4k.
+
+inference:
+  num_simulations: 4000
