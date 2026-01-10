@@ -12,6 +12,7 @@ from predator_prey_sbi.parameters import (
     resolve_lv_params,
     resolve_noise_scales,
     resolve_observation_lag,
+    resolve_observation_power,
     resolve_observation_scales,
     resolve_process_noise_scale,
 )
@@ -68,7 +69,14 @@ def build_simulator(
         sim_noise = resolve_noise_scales(values, noise_scale)
         sim_process_noise = resolve_process_noise_scale(values, process_noise_scale)
         sim_obs_scale = resolve_observation_scales(values)
+        sim_obs_power = resolve_observation_power(values)
         sim_obs_lag = resolve_observation_lag(values, 0.0)
+        obs_ref: tuple[float, float] | None = None
+        if sim_obs_power != (1.0, 1.0) and {"log_x_eq", "log_y_eq"}.issubset(values):
+            obs_ref = (
+                float(np.exp(float(values["log_x_eq"]))),
+                float(np.exp(float(values["log_y_eq"]))),
+            )
         hare_sim, lynx_sim = simulate_lv(
             years=years,
             params=params,
@@ -78,6 +86,8 @@ def build_simulator(
             process_noise_scale=sim_process_noise,
             rng_seed=None,
             observation_scale=sim_obs_scale,
+            observation_power=sim_obs_power,
+            observation_reference=obs_ref,
             observation_operator=observation_operator,
             observation_substeps=observation_substeps,
             observation_lag=sim_obs_lag,

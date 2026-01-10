@@ -18,6 +18,7 @@ from predator_prey_sbi.parameters import (
     resolve_lv_params,
     resolve_noise_scales,
     resolve_observation_lag,
+    resolve_observation_power,
     resolve_observation_scales,
     resolve_process_noise_scale,
 )
@@ -113,6 +114,13 @@ def posterior_predictive(
         sim_process_noise = resolve_process_noise_scale(params, process_noise_scale)
         sim_obs_scale = resolve_observation_scales(params)
         sim_obs_lag = resolve_observation_lag(params, 0.0)
+        sim_obs_power = resolve_observation_power(params)
+        obs_ref: tuple[float, float] | None = None
+        if sim_obs_power != (1.0, 1.0) and {"log_x_eq", "log_y_eq"}.issubset(params):
+            obs_ref = (
+                float(np.exp(float(params["log_x_eq"]))),
+                float(np.exp(float(params["log_y_eq"]))),
+            )
         hare_sim, lynx_sim = simulate_lv(
             years=years,
             params=resolve_lv_params(params),
@@ -122,6 +130,8 @@ def posterior_predictive(
             process_noise_scale=sim_process_noise,
             rng_seed=int(noise_seed_rng.integers(0, 2**32 - 1)),
             observation_scale=sim_obs_scale,
+            observation_power=sim_obs_power,
+            observation_reference=obs_ref,
             observation_operator=observation_operator,
             observation_substeps=observation_substeps,
             observation_lag=sim_obs_lag,
@@ -233,6 +243,8 @@ def latent_dynamics_diagnostic(
             process_noise_scale=sim_process_noise,
             rng_seed=int(rng.integers(0, 2**32 - 1)),
             observation_scale=(1.0, 1.0),
+            observation_power=(1.0, 1.0),
+            observation_reference=None,
             observation_operator=observation_operator,
             observation_substeps=observation_substeps,
             observation_lag=sim_obs_lag,

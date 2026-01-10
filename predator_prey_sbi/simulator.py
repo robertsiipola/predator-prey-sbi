@@ -13,6 +13,8 @@ def simulate_lv(
     rng_seed: int | None,
     process_noise_scale: float = 0.0,
     observation_scale: tuple[float, float] = (1.0, 1.0),
+    observation_power: tuple[float, float] = (1.0, 1.0),
+    observation_reference: tuple[float, float] | None = None,
     observation_operator: str = "point",
     observation_substeps: int = 10,
     observation_lag: float = 0.0,
@@ -32,6 +34,12 @@ def simulate_lv(
         raise ValueError("process_noise_scale must be non-negative")
     if observation_scale[0] <= 0 or observation_scale[1] <= 0:
         raise ValueError("observation_scale values must be positive")
+    if observation_power[0] <= 0 or observation_power[1] <= 0:
+        raise ValueError("observation_power values must be positive")
+    if observation_reference is not None and (
+        observation_reference[0] <= 0 or observation_reference[1] <= 0
+    ):
+        raise ValueError("observation_reference values must be positive")
 
     years_array = np.asarray(years, dtype=float)
     if not np.all(np.diff(years_array) > 0):
@@ -152,6 +160,12 @@ def simulate_lv(
         prey = solver.y[0]
         predator = solver.y[1]
 
+    prey, predator = _apply_power_index(
+        prey,
+        predator,
+        observation_power=observation_power,
+        observation_reference=observation_reference,
+    )
     prey = prey * float(observation_scale[0])
     predator = predator * float(observation_scale[1])
 
@@ -162,6 +176,30 @@ def simulate_lv(
         predator = _apply_log_noise(predator, noise[1], rng)
 
     return prey.tolist(), predator.tolist()
+
+
+def _apply_power_index(
+    prey: np.ndarray,
+    predator: np.ndarray,
+    *,
+    observation_power: tuple[float, float],
+    observation_reference: tuple[float, float] | None,
+) -> tuple[np.ndarray, np.ndarray]:
+    p_h, p_l = float(observation_power[0]), float(observation_power[1])
+    if p_h == 1.0 and p_l == 1.0:
+        return prey, predator
+    if observation_reference is None:
+        raise ValueError(
+            "observation_reference is required when observation_power != (1, 1)"
+        )
+    ref_h, ref_l = float(observation_reference[0]), float(observation_reference[1])
+    if ref_h <= 0 or ref_l <= 0:
+        raise ValueError("observation_reference values must be positive")
+    safe_prey = np.clip(prey, 1e-9, None)
+    safe_predator = np.clip(predator, 1e-9, None)
+    prey_out = ref_h * np.exp(p_h * (np.log(safe_prey) - np.log(ref_h)))
+    pred_out = ref_l * np.exp(p_l * (np.log(safe_predator) - np.log(ref_l)))
+    return prey_out, pred_out
 
 
 def _simulate_with_process_noise(
