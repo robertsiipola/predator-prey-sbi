@@ -158,6 +158,23 @@ def resolve_observation_scales(
     return default_scales
 
 
+def resolve_observation_lag(
+    values: Mapping[str, float],
+    default_lag: float = 0.0,
+) -> float:
+    if "obs_lag" in values:
+        lag = float(values["obs_lag"])
+        if not math.isfinite(lag):
+            raise ValueError("obs_lag must be finite")
+        return lag
+    if "tau_obs" in values:
+        lag = float(values["tau_obs"])
+        if not math.isfinite(lag):
+            raise ValueError("tau_obs must be finite")
+        return lag
+    return float(default_lag)
+
+
 def resolve_initial_conditions(
     values: Mapping[str, float],
     base_x0: tuple[float, float],

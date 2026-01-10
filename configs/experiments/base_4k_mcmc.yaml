@@ -1,0 +1,8 @@
+# Experiment: switch posterior sampling to MCMC (slice).
+
+extends: ../base.yaml
+
+inference:
+  num_simulations: 4000
+  sample_with: mcmc
+  mcmc_method: slice_np

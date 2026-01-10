@@ -17,6 +17,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "dt": 0.1,
     "observation_operator": "point",
     "observation_substeps": 10,
+    "observation_lag": 0.0,
     "use_observed_initial": True,
     "x0": [10.0, 10.0],
     "plot": {
@@ -37,6 +38,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "include_process_noise": False,
         "include_holling": False,
         "include_observation_scale": False,
+        "include_observation_lag": False,
         "feature_mode": "embedding",
         "embedding": {
             "model": "nsf",
@@ -102,9 +104,32 @@ def _deep_update(base: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any
 
 
 def load_config(path: str) -> dict[str, Any]:
-    config_path = Path(path)
+    config_path = Path(path).resolve()
+    return _load_config_with_extends(config_path, seen=set())
+
+
+def _load_config_with_extends(
+    config_path: Path,
+    seen: set[Path],
+) -> dict[str, Any]:
+    if config_path in seen:
+        cycle = " -> ".join(str(p) for p in [*seen, config_path])
+        raise ValueError(f"Config extends cycle detected: {cycle}")
+    seen.add(config_path)
+
     with config_path.open("r", encoding="utf-8") as handle:
         loaded = yaml.safe_load(handle) or {}
     if not isinstance(loaded, dict):
         raise ValueError("Config must be a mapping")
-    return _deep_update(DEFAULT_CONFIG, loaded)
+
+    extends_value = loaded.get("extends")
+    base = dict(DEFAULT_CONFIG)
+    if extends_value is not None:
+        if not isinstance(extends_value, str) or not extends_value.strip():
+            raise ValueError("Config 'extends' must be a non-empty string path")
+        base_path = (config_path.parent / extends_value).resolve()
+        base = _load_config_with_extends(base_path, seen)
+
+    merged = dict(loaded)
+    merged.pop("extends", None)
+    return _deep_update(base, merged)

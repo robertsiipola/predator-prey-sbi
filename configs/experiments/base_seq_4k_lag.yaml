@@ -1,0 +1,7 @@
+# Experiment: base_seq_4k but infer a shared fractional observation lag (obs_lag in years).
+
+extends: base_seq_4k.yaml
+
+inference:
+  include_observation_lag: true
+

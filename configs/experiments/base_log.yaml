@@ -1,4 +1,6 @@
 # Experiment: same as base, but use log-transform inputs for embedding (instead of log1p).
 
+extends: ../base.yaml
+
 inference:
   embedding_transform: log

@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 set -euo pipefail
 
-echo "Running experiments in $(pwd)"
+echo "Running targeted experiments in $(pwd)"
 
 out_file=".agent/experiment_results.tsv"
 if [[ ! -f "$out_file" ]]; then
@@ -12,22 +12,12 @@ ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 typeset -a CONFIGS
 CONFIGS=(
-  configs/base.yaml
-  configs/experiments/base_log.yaml
   configs/experiments/base_4k.yaml
-  configs/experiments/base_log_4k.yaml
   configs/experiments/base_seq_4k.yaml
   configs/experiments/base_4k_mcmc.yaml
   configs/experiments/base_4k_sigma_p_hi_obs_cap02.yaml
   configs/experiments/base_6k.yaml
   configs/experiments/base_8k.yaml
-  configs/experiments/linear_tau_damp.yaml
-  configs/experiments/linear_obs_scale.yaml
-  configs/experiments/linear_obs_scale_tau_damp.yaml
-  configs/experiments/holling_ii.yaml
-  configs/experiments/holling_ii_tau_damp.yaml
-  configs/experiments/holling_ii_obs_scale.yaml
-  configs/experiments/holling_ii_summary.yaml
 )
 
 for cfg in "${CONFIGS[@]}"; do
@@ -42,7 +32,6 @@ print(f"{m.get('posterior_predictive_hare_rmse')}\t{m.get('posterior_predictive_
 PY
 )
   echo -e "${ts}\t${cfg}\t${post}\t${diag_json}\t${rmse_line}" >> "$out_file"
-
 done
 
-echo "Wrote $out_file"
+echo "Appended results to $out_file"

@@ -1,0 +1,13 @@
+# Experiment: allow higher process noise while capping observation noise to avoid
+# "noise explains everything" via sigma_h/sigma_l.
+
+extends: ../base.yaml
+
+inference:
+  num_simulations: 4000
+  prior:
+    # log(1e-3) to log(0.6)
+    log_sigma_p: [-6.907755278982137, -0.5108256237659907]
+    # log(0.05) to log(0.2)
+    log_sigma_h: [-2.995732273553991, -1.6094379124341003]
+    log_sigma_l: [-2.995732273553991, -1.6094379124341003]

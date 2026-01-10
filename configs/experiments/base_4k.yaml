@@ -1,4 +1,6 @@
 # Experiment: increase simulation budget to 4k.
 
+extends: ../base.yaml
+
 inference:
   num_simulations: 4000

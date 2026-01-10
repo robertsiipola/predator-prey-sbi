@@ -1,5 +1,7 @@
 # Experiment: observation scaling + tau_damp parameterization + process noise.
 
+extends: ../base.yaml
+
 inference:
   include_observation_scale: true
   include_process_noise: true

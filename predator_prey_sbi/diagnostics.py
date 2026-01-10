@@ -17,6 +17,7 @@ from predator_prey_sbi.parameters import (
     resolve_initial_conditions,
     resolve_lv_params,
     resolve_noise_scales,
+    resolve_observation_lag,
     resolve_observation_scales,
     resolve_process_noise_scale,
 )
@@ -111,6 +112,7 @@ def posterior_predictive(
         sim_noise = resolve_noise_scales(params, noise_scale)
         sim_process_noise = resolve_process_noise_scale(params, process_noise_scale)
         sim_obs_scale = resolve_observation_scales(params)
+        sim_obs_lag = resolve_observation_lag(params, 0.0)
         hare_sim, lynx_sim = simulate_lv(
             years=years,
             params=resolve_lv_params(params),
@@ -122,6 +124,7 @@ def posterior_predictive(
             observation_scale=sim_obs_scale,
             observation_operator=observation_operator,
             observation_substeps=observation_substeps,
+            observation_lag=sim_obs_lag,
         )
         hare_sims.append(hare_sim)
         lynx_sims.append(lynx_sim)
@@ -175,6 +178,145 @@ def posterior_predictive(
         "posterior_predictive_lynx_rmse_median": lynx_rmse_median,
         "posterior_predictive_plot": str(plot_path),
     }
+
+
+def _tau_damp_years_from_params(params: dict[str, float]) -> float | None:
+    if {"log_tau_damp"}.issubset(params):
+        tau = float(np.exp(float(params["log_tau_damp"])))
+        if not np.isfinite(tau) or tau <= 0:
+            return None
+        return tau
+    required = {"log_k_ratio", "log_T", "log_r"}
+    if not required.issubset(params):
+        return None
+    k_ratio = float(np.exp(float(params["log_k_ratio"])))
+    t = float(np.exp(float(params["log_T"])))
+    r = float(np.exp(float(params["log_r"])))
+    if not (np.isfinite(k_ratio) and np.isfinite(t) and np.isfinite(r)):
+        return None
+    if k_ratio <= 0 or t <= 0 or r <= 0:
+        return None
+    return (k_ratio * t) / (np.pi * r)
+
+
+def latent_dynamics_diagnostic(
+    posterior_samples: dict[str, np.ndarray],
+    years: list[float],
+    x0: tuple[float, float],
+    dt: float,
+    process_noise_scale: float,
+    n_draws: int,
+    n_plot: int,
+    seed: int | None,
+    observation_operator: str,
+    observation_substeps: int,
+    output_dir: Path,
+) -> dict[str, float | str]:
+    params_list = _sample_posterior_params(posterior_samples, n_draws, seed)
+    rng = np.random.default_rng(seed)
+
+    from predator_prey_sbi.simulator import simulate_lv
+
+    hare_latents: list[list[float]] = []
+    lynx_latents: list[list[float]] = []
+    tau_damps: list[float] = []
+    for params in params_list:
+        sim_x0 = resolve_initial_conditions(params, x0)
+        sim_process_noise = resolve_process_noise_scale(params, process_noise_scale)
+        sim_obs_lag = resolve_observation_lag(params, 0.0)
+        hare_latent, lynx_latent = simulate_lv(
+            years=years,
+            params=resolve_lv_params(params),
+            x0=sim_x0,
+            dt=dt,
+            noise_scale=0.0,
+            process_noise_scale=sim_process_noise,
+            rng_seed=int(rng.integers(0, 2**32 - 1)),
+            observation_scale=(1.0, 1.0),
+            observation_operator=observation_operator,
+            observation_substeps=observation_substeps,
+            observation_lag=sim_obs_lag,
+        )
+        hare_latents.append(hare_latent)
+        lynx_latents.append(lynx_latent)
+        tau = _tau_damp_years_from_params(params)
+        if tau is not None:
+            tau_damps.append(float(tau))
+
+    hare_arr = np.asarray(hare_latents, dtype=float)
+    lynx_arr = np.asarray(lynx_latents, dtype=float)
+
+    hare_mean = np.mean(hare_arr, axis=0)
+    lynx_mean = np.mean(lynx_arr, axis=0)
+
+    per_draw_hare_std = np.std(hare_arr, axis=1)
+    per_draw_lynx_std = np.std(lynx_arr, axis=1)
+    mean_hare_draw_std = float(np.mean(per_draw_hare_std))
+    mean_lynx_draw_std = float(np.mean(per_draw_lynx_std))
+    hare_mean_std = float(np.std(hare_mean))
+    lynx_mean_std = float(np.std(lynx_mean))
+    hare_phase_coherence = float(hare_mean_std / (mean_hare_draw_std + 1e-12))
+    lynx_phase_coherence = float(lynx_mean_std / (mean_lynx_draw_std + 1e-12))
+
+    n_t = hare_arr.shape[1]
+    mid = max(1, n_t // 2)
+    hare_damp_ratio = float(
+        np.median(
+            np.std(hare_arr[:, mid:], axis=1)
+            / (np.std(hare_arr[:, :mid], axis=1) + 1e-12)
+        )
+    )
+    lynx_damp_ratio = float(
+        np.median(
+            np.std(lynx_arr[:, mid:], axis=1)
+            / (np.std(lynx_arr[:, :mid], axis=1) + 1e-12)
+        )
+    )
+
+    fig, axes = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
+    n_plot_clipped = max(1, min(n_plot, hare_arr.shape[0]))
+    for idx in range(n_plot_clipped):
+        axes[0].plot(years, hare_arr[idx], color="tab:blue", alpha=0.25, linewidth=1.0)
+        axes[1].plot(
+            years, lynx_arr[idx], color="tab:orange", alpha=0.25, linewidth=1.0
+        )
+    axes[0].plot(
+        years, hare_mean, color="tab:blue", linewidth=2.0, label="Mean over draws"
+    )
+    axes[1].plot(
+        years, lynx_mean, color="tab:orange", linewidth=2.0, label="Mean over draws"
+    )
+    axes[0].set_ylabel("Hare (latent annual)")
+    axes[1].set_ylabel("Lynx (latent annual)")
+    axes[1].set_xlabel("Year")
+    axes[0].legend(loc="upper right")
+    axes[1].legend(loc="upper right")
+    for ax in axes:
+        ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    plot_path = output_dir / "latent_posterior_draws.png"
+    fig.savefig(plot_path)
+    plt.close(fig)
+
+    out: dict[str, float | str] = {
+        "latent_draws_plot": str(plot_path),
+        "latent_phase_coherence_hare": hare_phase_coherence,
+        "latent_phase_coherence_lynx": lynx_phase_coherence,
+        "latent_damping_ratio_hare": hare_damp_ratio,
+        "latent_damping_ratio_lynx": lynx_damp_ratio,
+    }
+    if tau_damps:
+        tau_arr = np.asarray(tau_damps, dtype=float)
+        record_years = float(years[-1] - years[0])
+        out.update(
+            {
+                "tau_damp_years_p10": float(np.percentile(tau_arr, 10.0)),
+                "tau_damp_years_p50": float(np.percentile(tau_arr, 50.0)),
+                "tau_damp_years_p90": float(np.percentile(tau_arr, 90.0)),
+                "tau_damp_frac_lt_record": float(np.mean(tau_arr < record_years)),
+            }
+        )
+    return out
 
 
 def _sbc_rank_histogram(
@@ -306,6 +448,27 @@ def diagnostics_from_file(
                 output_dir=run_dir,
             )
         )
+
+        latent_cfg = diagnostics_cfg.get("latent_diagnostics", {})
+        latent_enabled = bool(latent_cfg.get("enabled", False))
+        if latent_enabled:
+            latent_draws = int(latent_cfg.get("num_draws", n_draws))
+            latent_plot = int(latent_cfg.get("num_plot", 30))
+            metrics.update(
+                latent_dynamics_diagnostic(
+                    posterior_samples=posterior_samples,
+                    years=years,
+                    x0=x0,
+                    dt=dt,
+                    process_noise_scale=process_noise_scale,
+                    n_draws=latent_draws,
+                    n_plot=latent_plot,
+                    seed=seed,
+                    observation_operator=observation_operator,
+                    observation_substeps=observation_substeps,
+                    output_dir=run_dir,
+                )
+            )
     else:
         metrics["posterior_predictive_skipped"] = True
 
@@ -337,6 +500,7 @@ def diagnostics_from_file(
     include_observation_scale = bool(
         inference_cfg.get("include_observation_scale", False)
     )
+    include_observation_lag = bool(inference_cfg.get("include_observation_lag", False))
     parameter_order = list(
         inference_cfg.get(
             "parameter_order",
@@ -383,6 +547,7 @@ def diagnostics_from_file(
             include_process_noise=include_process_noise,
             include_holling=include_holling,
             include_observation_scale=include_observation_scale,
+            include_observation_lag=include_observation_lag,
         )
     simulator = build_simulator(
         years=years,

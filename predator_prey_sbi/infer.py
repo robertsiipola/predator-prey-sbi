@@ -9,7 +9,12 @@ import torch
 from predator_prey_sbi.config import load_config
 from predator_prey_sbi.data import load_lynx_hare
 from predator_prey_sbi.features import build_embedding_input, summarize_series
-from predator_prey_sbi.npe import build_prior, build_simulator, train_posterior
+from predator_prey_sbi.npe import (
+    build_prior,
+    build_simulator,
+    train_posterior,
+    train_posterior_sequential,
+)
 from predator_prey_sbi.priors import build_structure_aware_prior
 from predator_prey_sbi.runtime import configure_runtime
 
@@ -42,6 +47,16 @@ def infer_from_file(config_path: str, observed_path: str) -> str:
         inference_cfg.get("embedding", {}) if isinstance(inference_cfg, dict) else {}
     )
     embedding_transform = str(inference_cfg.get("embedding_transform", "log1p"))
+    sequential_cfg = (
+        inference_cfg.get("sequential", {}) if isinstance(inference_cfg, dict) else {}
+    )
+    sequential_rounds = int(sequential_cfg.get("num_rounds", 1))
+    sequential_prior_mixin = float(sequential_cfg.get("prior_mixin", 0.0))
+    sequential_simulations_per_round = sequential_cfg.get("simulations_per_round")
+    if sequential_simulations_per_round is not None and not isinstance(
+        sequential_simulations_per_round, list
+    ):
+        raise ValueError("inference.sequential.simulations_per_round must be a list")
     prior_scheme = str(inference_cfg.get("prior_scheme", "default"))
     k_parameterization = str(inference_cfg.get("k_parameterization", "k_ratio"))
     include_process_noise = bool(inference_cfg.get("include_process_noise", False))
@@ -49,6 +64,7 @@ def infer_from_file(config_path: str, observed_path: str) -> str:
     include_observation_scale = bool(
         inference_cfg.get("include_observation_scale", False)
     )
+    include_observation_lag = bool(inference_cfg.get("include_observation_lag", False))
     parameter_order = list(
         inference_cfg.get(
             "parameter_order",
@@ -95,6 +111,7 @@ def infer_from_file(config_path: str, observed_path: str) -> str:
             include_process_noise=include_process_noise,
             include_holling=include_holling,
             include_observation_scale=include_observation_scale,
+            include_observation_lag=include_observation_lag,
         )
 
     if feature_mode.lower() == "embedding":
@@ -120,18 +137,40 @@ def infer_from_file(config_path: str, observed_path: str) -> str:
     )
 
     prior_low, prior_high = build_prior(prior_cfg, parameter_order)
-    posterior, _, _ = train_posterior(
-        simulator=simulator,
-        prior_low=prior_low,
-        prior_high=prior_high,
-        num_simulations=num_simulations,
-        num_workers=num_workers,
-        seed=seed,
-        sample_with=sample_with,
-        mcmc_method=mcmc_method,
-        feature_mode=feature_mode,
-        embedding_config=embedding_cfg,
-    )
+    if sequential_rounds > 1:
+        posterior, _, _ = train_posterior_sequential(
+            simulator=simulator,
+            prior_low=prior_low,
+            prior_high=prior_high,
+            x_o=x_o,
+            num_simulations=num_simulations,
+            num_rounds=sequential_rounds,
+            num_workers=num_workers,
+            seed=seed,
+            sample_with=sample_with,
+            mcmc_method=mcmc_method,
+            prior_mixin=sequential_prior_mixin,
+            simulations_per_round=(
+                [int(x) for x in sequential_simulations_per_round]
+                if sequential_simulations_per_round is not None
+                else None
+            ),
+            feature_mode=feature_mode,
+            embedding_config=embedding_cfg,
+        )
+    else:
+        posterior, _, _ = train_posterior(
+            simulator=simulator,
+            prior_low=prior_low,
+            prior_high=prior_high,
+            num_simulations=num_simulations,
+            num_workers=num_workers,
+            seed=seed,
+            sample_with=sample_with,
+            mcmc_method=mcmc_method,
+            feature_mode=feature_mode,
+            embedding_config=embedding_cfg,
+        )
 
     samples = posterior.sample((num_samples,), x=x_o)
 

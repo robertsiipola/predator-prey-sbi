@@ -74,6 +74,7 @@ def run_simulation(config_path: str) -> Path:
     rng_seed = config.get("rng_seed")
     observation_operator = str(config.get("observation_operator", "point"))
     observation_substeps = int(config.get("observation_substeps", 10))
+    observation_lag = float(config.get("observation_lag", 0.0))
 
     hare_sim, lynx_sim = simulate_lv(
         years=years,
@@ -84,6 +85,7 @@ def run_simulation(config_path: str) -> Path:
         rng_seed=rng_seed,
         observation_operator=observation_operator,
         observation_substeps=observation_substeps,
+        observation_lag=observation_lag,
     )
 
     run_dir = _make_run_dir(str(config.get("output_dir", "runs")))

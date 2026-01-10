@@ -1,5 +1,7 @@
 # Experiment: Holling type-II + observation scaling + process noise.
 
+extends: ../base.yaml
+
 inference:
   include_holling: true
   include_observation_scale: true

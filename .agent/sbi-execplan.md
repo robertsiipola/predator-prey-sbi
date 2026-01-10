@@ -34,10 +34,12 @@ The goal is to let a user infer predator-prey model parameters from the historic
 - [x] (2026-01-09 17:31Z) Added annual-mean and midpoint observation operators, posterior predictive mean RMSE reporting, and a latent process-noise option (log_sigma_p); ran an experiment sweep and recorded results in .agent/experiment_results.tsv.
 - [x] (2026-01-09 17:33Z) Added optional Holling type-II predation and discovered/fixed a bug where predator growth mistakenly used delta*(beta*predation) instead of delta*predation.
 - [x] (2026-01-09 18:05Z) Increased simulation budget to 4k for the current best-performing baseline and achieved hare RMSE ~35.6 (lynx ~19.8) on posterior predictive mean.
-- [ ] (2026-01-09 18:57Z) Next: scale up simulation budget sweep (6k/8k/12k) for the current best config and record the RMSE vs. runtime curve.
-- [ ] (2026-01-09 18:57Z) Next: run a small grid on process noise prior upper bound (log(0.08), log(0.12), log(0.2)) while capping observation noise to avoid “noise explains everything.”
-- [ ] (2026-01-09 18:57Z) Next: evaluate posterior sampling method (rejection vs MCMC) when acceptance is low; record effect on RMSE stability and runtime.
-- [ ] (2026-01-09 18:57Z) Next: try a 2-round SNPE schedule (e.g., 2k prior + 2k (80% proposal, 20% prior)) to concentrate simulations without losing calibration.
+- [ ] (2026-01-09 18:57Z) Next: scale up simulation budget sweep (completed: 6k/8k; remaining: 12k) for the current best config and record the RMSE vs. runtime curve.
+- [x] (2026-01-09 20:31Z) Tested a process-noise prior upper bound increase (to log(0.6)) while capping observation noise (to log(0.2)); it degraded RMSE in this run.
+- [x] (2026-01-09 20:31Z) Evaluated posterior sampling method (rejection vs MCMC): MCMC slightly improved one 4k run but sequential+MCMC was slow and degraded RMSE.
+- [x] (2026-01-09 22:48Z) Implemented and tested a 2-round SNPE schedule with a 20% prior mix-in; it produced a small RMSE improvement versus the single-round baseline in this run.
+- [x] (2026-01-10 07:33Z) Added a latent posterior-draw diagnostic (to separate damping vs phase decoherence) and discovered that mean-flattening is primarily phase decoherence: per-draw oscillations persist (median damping ratio ~1.05–1.08) but phase coherence is low (~0.16–0.18); also found config experiments were not inheriting from configs/base.yaml until adding an `extends:` mechanism.
+- [x] (2026-01-10 07:43Z) Implemented an inferred fractional observation lag (obs_lag in [0,1) years) and wired it through simulator/inference/diagnostics; first run did not materially change phase coherence or RMSE but provides the knob needed to test phase-alignment hypotheses.
 - [ ] (2026-01-09 18:57Z) Next: revisit observation scaling (log_c_h/log_c_l) with relaxed equilibrium priors (widen log_x_eq/log_y_eq ranges), since the current equilibrium-anchored priors may make scaling redundant.
 
 ## Surprises & Discoveries
@@ -80,6 +82,14 @@ The goal is to let a user infer predator-prey model parameters from the historic
   Evidence: .agent/experiment_results.tsv shows worse hare RMSE for configs/experiments/linear_obs_scale.yaml vs configs/base.yaml on 2026-01-09.
 - Observation: Rejection sampling can become extremely slow when the learned posterior is narrow (very low acceptance), which can dominate experiment runtime.
   Evidence: sbi emitted a low acceptance warning during posterior sampling in a prior sweep (warning reported ~0.6% acceptance).
+- Observation: 2-round sequential SNPE (with a 20% prior mix-in) provided a small RMSE improvement at fixed budget, but MCMC posterior sampling was extremely slow and degraded RMSE in the tested sequential run.
+  Evidence: .agent/experiment_results.tsv shows hare RMSE ~35.56 for configs/experiments/base_seq_4k.yaml and ~37.22 for configs/experiments/base_seq_4k_mcmc.yaml on 2026-01-09.
+- Observation: Under the current best sequential config, individual posterior draws keep oscillating but the pointwise mean flattens due to low phase coherence across draws.
+  Evidence: runs/2026-01-10_073235/diagnostics_metrics.json reports latent_phase_coherence_hare≈0.18 and latent_phase_coherence_lynx≈0.16 with median latent_damping_ratio_hare≈1.08 and latent_damping_ratio_lynx≈1.05 (plot: runs/2026-01-10_073235/latent_posterior_draws.png).
+- Observation: The inferred damping timescale is often shorter than the full record length, even though per-draw oscillations can persist via process noise; ~90% of draws have tau_damp < record length in the diagnostic run.
+  Evidence: runs/2026-01-10_073235/diagnostics_metrics.json reports tau_damp_frac_lt_record≈0.895 with tau_damp_years_p50≈35.3 years.
+- Observation: Adding an inferred observation lag parameter did not substantially increase phase coherence in the first run; coherence remained low (~0.18) and RMSE stayed ~36.
+  Evidence: runs/2026-01-10_074242/diagnostics_metrics.json reports latent_phase_coherence_hare≈0.19 and latent_phase_coherence_lynx≈0.18 with posterior_predictive_hare_rmse≈36.28 (config: configs/experiments/base_seq_4k_lag_latent_diag.yaml).
 
 ## Decision Log
 
@@ -128,12 +138,24 @@ The goal is to let a user infer predator-prey model parameters from the historic
 - Decision: Add optional Holling type-II predation (with inferred log_h) as a minimal structural extension beyond linear predation.
   Rationale: Saturating predation is a common mechanism for stabilizing cycles and may better match amplitude regulation in the lynx-hare record.
   Date/Author: 2026-01-09, Codex
+- Decision: Implement 2-round sequential SNPE (with optional prior mix-in) as an inference option, and force rejection sampling for proposal draws even when final posterior samples use MCMC.
+  Rationale: Sequential SNPE can concentrate simulations near the observed dataset, but proposal draws must be fast; MCMC proposal sampling was prohibitively slow in practice.
+  Date/Author: 2026-01-09, Codex
+- Decision: Add a `extends:` mechanism to YAML config loading and update all experiment configs to extend configs/base.yaml.
+  Rationale: Many experiment YAMLs were intended as overrides of configs/base.yaml but previously only overrode DEFAULT_CONFIG, silently changing observation operator and inference toggles (e.g., annual_mean and include_process_noise).
+  Date/Author: 2026-01-10, Codex
+- Decision: Add a latent posterior-draw diagnostic (overlay of latent trajectories + phase/damping summaries) to guide whether to change dynamics or observation timing.
+  Rationale: RMSE and mean trajectories can be misleading when posterior draws are oscillatory but out of phase; separating damping vs phase decoherence determines the next modeling move.
+  Date/Author: 2026-01-10, Codex
+- Decision: Add an inferred fractional observation lag parameter (obs_lag) and apply it consistently across all observation operators (point/midpoint/annual_mean), including the process-noise path.
+  Rationale: If annual sampling is systematically phase-shifted relative to the underlying ecological dynamics (or fur-return timing), a shared fractional lag is a minimal, testable way to improve alignment without changing the ecological model.
+  Date/Author: 2026-01-10, Codex
 
 ## Outcomes & Retrospective
 
 Milestones 1–4 are implemented and verified with inference + diagnostics runs. Logistic prey growth (carrying capacity k) improved RMSE substantially versus the baseline. Adding inferred observation noise marginally improved lynx RMSE while keeping hare RMSE similar, while mechanistic regression summaries, the learned embedding, and the structure-aware priors (even after tightening) did not improve RMSE in the first trials; further gains likely need a larger simulation budget, alternative priors, or model/observation adjustments.
 
-As of 2026-01-09, the best observed hare RMSE in this round of experiments is ~35.6 (lynx ~19.8) using annual_mean observations, inferred latent process noise (log_sigma_p), and a 4k simulation budget. Additional structural extensions (Holling type-II) did not improve RMSE in the first sweep, and per-species observation scaling did not help under the current equilibrium-anchored priors.
+As of 2026-01-09, the best observed hare RMSE in this round of experiments is ~35.6 (lynx ~19.4) using annual_mean observations, inferred latent process noise (log_sigma_p), and a 2-round sequential SNPE run with 4k total simulations (see configs/experiments/base_seq_4k.yaml). Additional structural extensions (Holling type-II) did not improve RMSE in the first sweep, and per-species observation scaling did not help under the current equilibrium-anchored priors.
 
 ## Context and Orientation
 
@@ -295,3 +317,4 @@ Change Note: 2026-01-05 19:11Z — Added structure-aware parameterization/priors
 Change Note: 2026-01-09 17:31Z — Added observation operators (point/midpoint/annual_mean), latent process noise (log_sigma_p), tau_damp/k_ratio switch, and posterior predictive mean RMSE; ran a sweep and recorded results in .agent/experiment_results.tsv.
 Change Note: 2026-01-09 17:33Z — Added optional Holling type-II predation and fixed a Holling/linear predation bug in predator growth term.
 Change Note: 2026-01-09 18:05Z — Increased simulation budget experiments to 4k and recorded the improved RMSE for configs/experiments/base_4k.yaml.
+Change Note: 2026-01-09 23:40Z — Added optional 2-round sequential SNPE (with prior mix-in) and new experiment configs/scripts; recorded updated RMSE results in .agent/experiment_results.tsv.
