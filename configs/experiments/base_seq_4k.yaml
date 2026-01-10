@@ -1,0 +1,10 @@
+# Experiment: 2-round SNPE (2k prior + 2k proposal) with a 20% prior mix-in.
+
+extends: ../base.yaml
+
+inference:
+  num_simulations: 4000
+  sequential:
+    num_rounds: 2
+    prior_mixin: 0.2
+    simulations_per_round: [2000, 2000]

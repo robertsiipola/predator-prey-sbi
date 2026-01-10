@@ -1,5 +1,7 @@
 # Experiment: add per-species observation scaling (catchability) with process noise.
 
+extends: ../base.yaml
+
 inference:
   include_observation_scale: true
   include_process_noise: true

@@ -1,5 +1,7 @@
 # Experiment: enable Holling type-II functional response with process noise.
 
+extends: ../base.yaml
+
 inference:
   include_holling: true
   include_process_noise: true

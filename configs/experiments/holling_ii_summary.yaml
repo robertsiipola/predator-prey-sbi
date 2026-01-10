@@ -1,5 +1,7 @@
 # Experiment: Holling type-II + summary features (no embedding) + process noise.
 
+extends: ../base.yaml
+
 inference:
   feature_mode: summary
   include_holling: true

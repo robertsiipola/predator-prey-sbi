@@ -1,5 +1,7 @@
 # Experiment: Linear predation (baseline model) but tau_damp parameterization + process noise.
 
+extends: ../base.yaml
+
 inference:
   k_parameterization: tau_damp
   include_holling: false

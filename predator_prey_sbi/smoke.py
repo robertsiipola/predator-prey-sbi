@@ -54,6 +54,7 @@ def run_smoke_test(
             dt=0.1,
             noise_scale=0.0,
             rng_seed=None,
+            observation_lag=0.0,
         )
         summary = summarize_series(hare_sim, lynx_sim)
         return torch.tensor(summary, dtype=torch.float32)

@@ -14,6 +14,7 @@ def build_structure_aware_prior(
     include_process_noise: bool = False,
     include_holling: bool = False,
     include_observation_scale: bool = False,
+    include_observation_lag: bool = False,
 ) -> tuple[list[str], dict[str, list[float]]]:
     hare_arr = np.asarray(hare_obs, dtype=float)
     lynx_arr = np.asarray(lynx_obs, dtype=float)
@@ -98,6 +99,11 @@ def build_structure_aware_prior(
         insert_at = parameter_order.index("eps_h0")
         parameter_order.insert(insert_at, "log_c_l")
         parameter_order.insert(insert_at, "log_c_h")
+
+    if include_observation_lag:
+        defaults["obs_lag"] = [-0.25, 0.75]
+        insert_at = parameter_order.index("eps_h0")
+        parameter_order.insert(insert_at, "obs_lag")
 
     if overrides:
         for key, value in overrides.items():

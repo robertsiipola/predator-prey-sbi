@@ -1,0 +1,10 @@
+# Experiment: base_seq_4k_lag with latent dynamics diagnostics enabled.
+
+extends: base_seq_4k_lag.yaml
+
+diagnostics:
+  latent_diagnostics:
+    enabled: true
+    num_draws: 200
+    num_plot: 30
+
