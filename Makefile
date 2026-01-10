@@ -1,4 +1,4 @@
-.PHONY: format lint typecheck test check simulate smoke infer diagnostics
+.PHONY: format lint typecheck test check simulate smoke infer diagnostics diagnostics-latent
 
 POSTERIOR ?= runs/2026-01-04_185353/posterior_samples.npz
 
@@ -31,3 +31,7 @@ infer:
 diagnostics:
 	mkdir -p .cache/matplotlib arviz_data
 	HOME=$(PWD) MPLCONFIGDIR=$(PWD)/.cache/matplotlib uv run --no-cache python -m predator_prey_sbi.diagnostics --config configs/base.yaml --observed data/LynxHare.txt --posterior $(POSTERIOR)
+
+diagnostics-latent:
+	mkdir -p .cache/matplotlib arviz_data
+	HOME=$(PWD) MPLCONFIGDIR=$(PWD)/.cache/matplotlib uv run --no-cache python -m predator_prey_sbi.diagnostics --config configs/base.yaml --observed data/LynxHare.txt --posterior $(POSTERIOR) --latent-only
