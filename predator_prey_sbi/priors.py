@@ -101,7 +101,7 @@ def build_structure_aware_prior(
         parameter_order.insert(insert_at, "log_c_h")
 
     if include_observation_lag:
-        defaults["obs_lag"] = [-0.25, 0.75]
+        defaults["obs_lag"] = [0.0, 1.0]
         insert_at = parameter_order.index("eps_h0")
         parameter_order.insert(insert_at, "obs_lag")
 

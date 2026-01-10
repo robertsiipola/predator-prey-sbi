@@ -1,4 +1,4 @@
-.PHONY: format lint typecheck check simulate smoke infer diagnostics
+.PHONY: format lint typecheck test check simulate smoke infer diagnostics
 
 POSTERIOR ?= runs/2026-01-04_185353/posterior_samples.npz
 
@@ -12,6 +12,9 @@ typecheck:
 	ty check .
 
 check: format lint typecheck
+
+test:
+	UV_CACHE_DIR=$(PWD)/.uv-cache uv run --no-cache python -m pytest -q
 
 simulate:
 	mkdir -p .cache/matplotlib

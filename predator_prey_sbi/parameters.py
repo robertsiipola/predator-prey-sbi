@@ -166,11 +166,15 @@ def resolve_observation_lag(
         lag = float(values["obs_lag"])
         if not math.isfinite(lag):
             raise ValueError("obs_lag must be finite")
+        if lag < 0:
+            raise ValueError("obs_lag must be non-negative")
         return lag
     if "tau_obs" in values:
         lag = float(values["tau_obs"])
         if not math.isfinite(lag):
             raise ValueError("tau_obs must be finite")
+        if lag < 0:
+            raise ValueError("tau_obs must be non-negative")
         return lag
     return float(default_lag)
 
