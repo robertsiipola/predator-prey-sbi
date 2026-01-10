@@ -143,6 +143,15 @@ def posterior_predictive(
     hare_rmse_median = float(np.sqrt(np.mean((hare_q50 - np.asarray(hare_obs)) ** 2)))
     lynx_rmse_median = float(np.sqrt(np.mean((lynx_q50 - np.asarray(lynx_obs)) ** 2)))
 
+    residual_metrics = _residual_diagnostics(
+        years=years,
+        hare_obs=np.asarray(hare_obs, dtype=float),
+        lynx_obs=np.asarray(lynx_obs, dtype=float),
+        hare_pred=hare_mean,
+        lynx_pred=lynx_mean,
+        output_dir=output_dir,
+    )
+
     fig, axes = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
     axes[0].fill_between(years, hare_q05, hare_q95, color="tab:blue", alpha=0.2)
     axes[0].plot(years, hare_q50, color="tab:blue", label="Posterior median")
@@ -177,6 +186,91 @@ def posterior_predictive(
         "posterior_predictive_hare_rmse_median": hare_rmse_median,
         "posterior_predictive_lynx_rmse_median": lynx_rmse_median,
         "posterior_predictive_plot": str(plot_path),
+        **residual_metrics,
+    }
+
+
+def _acf(x: np.ndarray, max_lag: int) -> np.ndarray:
+    if max_lag < 0:
+        raise ValueError("max_lag must be non-negative")
+    x0 = np.asarray(x, dtype=float)
+    if x0.size == 0:
+        return np.zeros(max_lag + 1, dtype=float)
+    x_centered = x0 - float(np.mean(x0))
+    denom = float(np.dot(x_centered, x_centered))
+    if denom <= 0:
+        out = np.zeros(max_lag + 1, dtype=float)
+        out[0] = 1.0
+        return out
+    out = np.empty(max_lag + 1, dtype=float)
+    out[0] = 1.0
+    for lag in range(1, max_lag + 1):
+        if lag >= x_centered.size:
+            out[lag] = np.nan
+            continue
+        out[lag] = float(np.dot(x_centered[:-lag], x_centered[lag:]) / denom)
+    return out
+
+
+def _residual_diagnostics(
+    *,
+    years: list[float],
+    hare_obs: np.ndarray,
+    lynx_obs: np.ndarray,
+    hare_pred: np.ndarray,
+    lynx_pred: np.ndarray,
+    output_dir: Path,
+    max_lag: int = 15,
+) -> dict[str, float | str]:
+    if hare_obs.shape != hare_pred.shape or lynx_obs.shape != lynx_pred.shape:
+        raise ValueError("Observed and predicted series must have the same shape")
+
+    safe_h_obs = np.clip(hare_obs, 1e-9, None)
+    safe_l_obs = np.clip(lynx_obs, 1e-9, None)
+    safe_h_pred = np.clip(hare_pred, 1e-9, None)
+    safe_l_pred = np.clip(lynx_pred, 1e-9, None)
+
+    hare_resid = np.log(safe_h_obs) - np.log(safe_h_pred)
+    lynx_resid = np.log(safe_l_obs) - np.log(safe_l_pred)
+
+    hare_acf = _acf(hare_resid, max_lag=max_lag)
+    lynx_acf = _acf(lynx_resid, max_lag=max_lag)
+    corr0 = float(np.corrcoef(hare_resid, lynx_resid)[0, 1])
+
+    fig, axes = plt.subplots(2, 2, figsize=(10, 6), sharex="col")
+    axes[0, 0].plot(years, hare_resid, color="tab:blue")
+    axes[0, 0].axhline(0.0, color="black", linewidth=1.0, alpha=0.5)
+    axes[0, 0].set_title("Hare log residuals")
+    axes[1, 0].plot(years, lynx_resid, color="tab:orange")
+    axes[1, 0].axhline(0.0, color="black", linewidth=1.0, alpha=0.5)
+    axes[1, 0].set_title("Lynx log residuals")
+    axes[1, 0].set_xlabel("Year")
+
+    lags = np.arange(max_lag + 1)
+    axes[0, 1].bar(lags, hare_acf, color="tab:blue", alpha=0.8)
+    axes[0, 1].set_title("Hare residual ACF")
+    axes[1, 1].bar(lags, lynx_acf, color="tab:orange", alpha=0.8)
+    axes[1, 1].set_title("Lynx residual ACF")
+    axes[1, 1].set_xlabel("Lag (years)")
+
+    for ax in axes.flat:
+        ax.grid(True, alpha=0.3)
+
+    fig.suptitle(f"Residual diagnostics (corr@0={corr0:.2f})", y=1.02)
+    fig.tight_layout()
+    plot_path = output_dir / "residual_diagnostics.png"
+    fig.savefig(plot_path)
+    plt.close(fig)
+
+    return {
+        "residual_diagnostics_plot": str(plot_path),
+        "residual_corr_hare_lynx_lag0": corr0,
+        "residual_acf_hare_lag1": float(hare_acf[1])
+        if hare_acf.size > 1
+        else float("nan"),
+        "residual_acf_lynx_lag1": float(lynx_acf[1])
+        if lynx_acf.size > 1
+        else float("nan"),
     }
 
 
