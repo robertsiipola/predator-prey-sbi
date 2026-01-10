@@ -12,3 +12,4 @@ unknown	configs/experiments/base_4k.yaml	runs/2026-01-09_175538/posterior_sample
 2026-01-10T07:33:03Z	configs/experiments/base_seq_4k_latent_diag.yaml	runs/2026-01-10_073228/posterior_samples.npz	runs/2026-01-10_073235/diagnostics_metrics.json	36.353722837056594	18.654002513260416
 2026-01-10T07:43:12Z	configs/experiments/base_seq_4k_lag_latent_diag.yaml	runs/2026-01-10_074233/posterior_samples.npz	runs/2026-01-10_074242/diagnostics_metrics.json	36.284967872158944	19.041401523545787
 2026-01-10T08:00:37Z	configs/experiments/base_seq_4k_lag_latent_diag.yaml	runs/2026-01-10_075958/posterior_samples.npz	runs/2026-01-10_080006/diagnostics_metrics.json	36.76499952127632	18.962300364487547
+2026-01-10T13:32:20Z	configs/experiments/obs_power.yaml	runs/2026-01-10_133110/posterior_samples.npz	runs/2026-01-10_133134/diagnostics_metrics.json	38.29528809821113	19.205532078917482
