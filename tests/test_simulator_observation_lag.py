@@ -25,7 +25,7 @@ def test_simulate_lv_observation_lag_finite_required() -> None:
         )
 
 
-def test_simulate_lv_negative_observation_lag_supported_and_reproducible() -> None:
+def test_simulate_lv_negative_observation_lag_rejected() -> None:
     years = _years(8)
     params = {"alpha": 1.0, "beta": 0.02, "delta": 0.01, "gamma": 1.0}
     with pytest.raises(ValueError, match="observation_lag must be non-negative"):
@@ -39,6 +39,25 @@ def test_simulate_lv_negative_observation_lag_supported_and_reproducible() -> No
             observation_operator="annual_mean",
             observation_substeps=5,
             observation_lag=-0.25,
+        )
+
+
+def test_simulate_lv_annual_mean_observation_lag_must_be_less_than_year_step() -> None:
+    years = _years(6)
+    params = {"alpha": 1.0, "beta": 0.02, "delta": 0.01, "gamma": 1.0}
+    with pytest.raises(
+        ValueError, match="observation_lag must be less than the year step"
+    ):
+        simulate_lv(
+            years=years,
+            params=params,
+            x0=(10.0, 10.0),
+            dt=0.05,
+            noise_scale=0.0,
+            rng_seed=0,
+            observation_operator="annual_mean",
+            observation_substeps=5,
+            observation_lag=1.0,
         )
 
 
