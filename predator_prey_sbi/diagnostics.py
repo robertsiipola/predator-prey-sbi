@@ -395,6 +395,11 @@ def diagnostics_from_file(
     config_path: str,
     observed_path: str,
     posterior_path: str,
+    *,
+    force_latent: bool = False,
+    skip_posterior_predictive: bool = False,
+    skip_sbc: bool = False,
+    latent_only: bool = False,
 ) -> str:
     configure_runtime()
     config = load_config(config_path)
@@ -432,25 +437,30 @@ def diagnostics_from_file(
         )
         seed = diagnostics_cfg.get("seed", 0)
 
-        metrics.update(
-            posterior_predictive(
-                posterior_samples=posterior_samples,
-                years=years,
-                obs=(hare_obs, lynx_obs),
-                x0=x0,
-                dt=dt,
-                noise_scale=noise_scale,
-                process_noise_scale=process_noise_scale,
-                n_draws=n_draws,
-                seed=seed,
-                observation_operator=observation_operator,
-                observation_substeps=observation_substeps,
-                output_dir=run_dir,
+        if not (skip_posterior_predictive or latent_only):
+            metrics.update(
+                posterior_predictive(
+                    posterior_samples=posterior_samples,
+                    years=years,
+                    obs=(hare_obs, lynx_obs),
+                    x0=x0,
+                    dt=dt,
+                    noise_scale=noise_scale,
+                    process_noise_scale=process_noise_scale,
+                    n_draws=n_draws,
+                    seed=seed,
+                    observation_operator=observation_operator,
+                    observation_substeps=observation_substeps,
+                    output_dir=run_dir,
+                )
             )
-        )
+        else:
+            metrics["posterior_predictive_skipped"] = True
 
         latent_cfg = diagnostics_cfg.get("latent_diagnostics", {})
-        latent_enabled = bool(latent_cfg.get("enabled", False))
+        latent_enabled = (
+            bool(latent_cfg.get("enabled", False)) or force_latent or latent_only
+        )
         if latent_enabled:
             latent_draws = int(latent_cfg.get("num_draws", n_draws))
             latent_plot = int(latent_cfg.get("num_plot", 30))
@@ -473,6 +483,46 @@ def diagnostics_from_file(
         metrics["posterior_predictive_skipped"] = True
 
     sbc_cfg = diagnostics_cfg.get("sbc", {})
+    sbc_enabled = bool(sbc_cfg.get("enabled", True))
+    if skip_sbc or latent_only:
+        sbc_enabled = False
+        metrics["sbc_skipped"] = True
+    else:
+        metrics["sbc_skipped"] = not sbc_enabled
+
+    if not sbc_enabled:
+        metrics_path = run_dir / "diagnostics_metrics.json"
+        metrics_path.write_text(json.dumps(metrics, indent=2), encoding="utf-8")
+        print(f"Diagnostics metrics written to {metrics_path}")
+        if "posterior_predictive_hare_rmse" in metrics:
+            print(
+                "Posterior predictive RMSE (hare): {hare:.3f}; (lynx): {lynx:.3f}".format(
+                    hare=metrics["posterior_predictive_hare_rmse"],
+                    lynx=metrics["posterior_predictive_lynx_rmse"],
+                )
+            )
+        if "latent_phase_coherence_hare" in metrics:
+            print(
+                "Latent phase coherence (hare): {hare:.3f}; (lynx): {lynx:.3f}".format(
+                    hare=metrics["latent_phase_coherence_hare"],
+                    lynx=metrics["latent_phase_coherence_lynx"],
+                )
+            )
+            print(
+                "Latent damping ratio (hare): {hare:.3f}; (lynx): {lynx:.3f}".format(
+                    hare=metrics["latent_damping_ratio_hare"],
+                    lynx=metrics["latent_damping_ratio_lynx"],
+                )
+            )
+        if "tau_damp_years_p50" in metrics:
+            print(
+                "tau_damp years p50: {p50:.1f} (frac < record): {frac:.2f}".format(
+                    p50=metrics["tau_damp_years_p50"],
+                    frac=metrics["tau_damp_frac_lt_record"],
+                )
+            )
+        return str(run_dir)
+
     sbc_num_simulations = int(
         sbc_cfg.get(
             "num_simulations", config.get("inference", {}).get("num_simulations", 500)
@@ -603,6 +653,26 @@ def diagnostics_from_file(
                 lynx=metrics["posterior_predictive_lynx_rmse"],
             )
         )
+    if "latent_phase_coherence_hare" in metrics:
+        print(
+            "Latent phase coherence (hare): {hare:.3f}; (lynx): {lynx:.3f}".format(
+                hare=metrics["latent_phase_coherence_hare"],
+                lynx=metrics["latent_phase_coherence_lynx"],
+            )
+        )
+        print(
+            "Latent damping ratio (hare): {hare:.3f}; (lynx): {lynx:.3f}".format(
+                hare=metrics["latent_damping_ratio_hare"],
+                lynx=metrics["latent_damping_ratio_lynx"],
+            )
+        )
+    if "tau_damp_years_p50" in metrics:
+        print(
+            "tau_damp years p50: {p50:.1f} (frac < record): {frac:.2f}".format(
+                p50=metrics["tau_damp_years_p50"],
+                frac=metrics["tau_damp_frac_lt_record"],
+            )
+        )
     if "sbc_coverage" in metrics:
         print(f"SBC coverage: {metrics['sbc_coverage']}")
     return str(run_dir)
@@ -625,8 +695,38 @@ def main() -> None:
         default="",
         help="Path to posterior_samples.npz for posterior predictive checks.",
     )
+    parser.add_argument(
+        "--latent",
+        action="store_true",
+        help="Run latent damping/phase diagnostics regardless of config settings.",
+    )
+    parser.add_argument(
+        "--skip-sbc",
+        action="store_true",
+        help="Skip simulation-based calibration (SBC).",
+    )
+    parser.add_argument(
+        "--skip-posterior-predictive",
+        action="store_true",
+        help="Skip posterior predictive diagnostics.",
+    )
+    parser.add_argument(
+        "--latent-only",
+        action="store_true",
+        help="Only run latent diagnostics (implies --latent --skip-sbc --skip-posterior-predictive).",
+    )
     args = parser.parse_args()
-    diagnostics_from_file(args.config, args.observed, args.posterior)
+    diagnostics_from_file(
+        args.config,
+        args.observed,
+        args.posterior,
+        force_latent=bool(args.latent or args.latent_only),
+        skip_posterior_predictive=bool(
+            args.skip_posterior_predictive or args.latent_only
+        ),
+        skip_sbc=bool(args.skip_sbc or args.latent_only),
+        latent_only=bool(args.latent_only),
+    )
 
 
 if __name__ == "__main__":
