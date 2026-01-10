@@ -1,0 +1,19 @@
+extends: ../base.yaml
+
+inference:
+  include_observation_power: true
+  parameter_order:
+    - log_T
+    - log_r
+    - log_x_eq
+    - log_y_eq
+    - log_k_ratio
+    - log_sigma_p
+    - p
+    - eps_h0
+    - eps_l0
+    - log_sigma_h
+    - log_sigma_l
+  prior:
+    p: [0.7, 1.3]
+

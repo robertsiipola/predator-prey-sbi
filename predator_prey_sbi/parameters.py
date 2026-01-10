@@ -158,6 +158,30 @@ def resolve_observation_scales(
     return default_scales
 
 
+def resolve_observation_power(
+    values: Mapping[str, float],
+    default_power: tuple[float, float] = (1.0, 1.0),
+) -> tuple[float, float]:
+    if "p" in values:
+        p = float(values["p"])
+        if not math.isfinite(p):
+            raise ValueError("p must be finite")
+        if p <= 0:
+            raise ValueError("p must be positive")
+        return p, p
+    if "p_h" in values or "p_l" in values:
+        if "p_h" not in values or "p_l" not in values:
+            raise ValueError("Both p_h and p_l are required")
+        p_h = float(values["p_h"])
+        p_l = float(values["p_l"])
+        if not (math.isfinite(p_h) and math.isfinite(p_l)):
+            raise ValueError("p_h/p_l must be finite")
+        if p_h <= 0 or p_l <= 0:
+            raise ValueError("p_h/p_l must be positive")
+        return p_h, p_l
+    return default_power
+
+
 def resolve_observation_lag(
     values: Mapping[str, float],
     default_lag: float = 0.0,

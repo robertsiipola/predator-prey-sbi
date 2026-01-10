@@ -64,6 +64,9 @@ def infer_from_file(config_path: str, observed_path: str) -> str:
     include_observation_scale = bool(
         inference_cfg.get("include_observation_scale", False)
     )
+    include_observation_power = bool(
+        inference_cfg.get("include_observation_power", False)
+    )
     include_observation_lag = bool(inference_cfg.get("include_observation_lag", False))
     parameter_order = list(
         inference_cfg.get(
@@ -111,6 +114,7 @@ def infer_from_file(config_path: str, observed_path: str) -> str:
             include_process_noise=include_process_noise,
             include_holling=include_holling,
             include_observation_scale=include_observation_scale,
+            include_observation_power=include_observation_power,
             include_observation_lag=include_observation_lag,
         )
 

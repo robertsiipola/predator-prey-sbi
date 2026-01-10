@@ -40,6 +40,7 @@ The goal is to let a user infer predator-prey model parameters from the historic
 - [x] (2026-01-09 22:48Z) Implemented and tested a 2-round SNPE schedule with a 20% prior mix-in; it produced a small RMSE improvement versus the single-round baseline in this run.
 - [x] (2026-01-10 07:33Z) Added a latent posterior-draw diagnostic (to separate damping vs phase decoherence) and discovered that mean-flattening is primarily phase decoherence: per-draw oscillations persist (median damping ratio ~1.05–1.08) but phase coherence is low (~0.16–0.18); also found config experiments were not inheriting from configs/base.yaml until adding an `extends:` mechanism.
 - [x] (2026-01-10 07:43Z) Implemented an inferred fractional observation lag (obs_lag in [0,1) years) and wired it through simulator/inference/diagnostics; first run did not materially change phase coherence or RMSE but provides the knob needed to test phase-alignment hypotheses.
+- [x] (2026-01-10 13:32Z) Prototyped an equilibrium-centered observation power index (p) (fur returns as a nonlinear index of abundance) and ran configs/experiments/obs_power.yaml; it produced posterior predictive RMSE hare 38.30 (lynx 19.21) and increased phase coherence (~0.32/0.27) but tended to reintroduce damping (tau_damp p50 ~34y).
 - [ ] (2026-01-09 18:57Z) Next: revisit observation scaling (log_c_h/log_c_l) with relaxed equilibrium priors (widen log_x_eq/log_y_eq ranges), since the current equilibrium-anchored priors may make scaling redundant.
 
 ## Surprises & Discoveries
