@@ -113,8 +113,7 @@ def _load_config_with_extends(
     seen: set[Path],
 ) -> dict[str, Any]:
     if config_path in seen:
-        cycle = " -> ".join(str(p) for p in [*seen, config_path])
-        raise ValueError(f"Config extends cycle detected: {cycle}")
+        raise ValueError("Config extends cycle detected")
     seen.add(config_path)
 
     with config_path.open("r", encoding="utf-8") as handle:

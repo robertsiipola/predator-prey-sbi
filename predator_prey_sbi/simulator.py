@@ -26,6 +26,8 @@ def simulate_lv(
         raise ValueError("observation_substeps must be positive")
     if not np.isfinite(observation_lag):
         raise ValueError("observation_lag must be finite")
+    if observation_lag < 0:
+        raise ValueError("observation_lag must be non-negative")
     if process_noise_scale < 0:
         raise ValueError("process_noise_scale must be non-negative")
     if observation_scale[0] <= 0 or observation_scale[1] <= 0:
@@ -89,7 +91,7 @@ def simulate_lv(
             predator = _apply_log_noise(predator, noise[1], rng)
         return prey.tolist(), predator.tolist()
 
-    t_start = float(t_eval[0] + observation_lag)
+    t_start = float(t_eval[0])
     if op in {"point", "points"}:
         t_end = float(t_eval[-1] + observation_lag)
         sample_times = t_eval + observation_lag
@@ -103,6 +105,8 @@ def simulate_lv(
         step = float(diffs[0])
         if not np.allclose(diffs, step, rtol=0.0, atol=1e-9):
             raise ValueError("annual_mean observation requires evenly spaced years")
+        if observation_lag >= step:
+            raise ValueError("observation_lag must be less than the year step")
         t_end = float(t_eval[-1] + step + observation_lag)
         sample_times = None
         needs_dense = True
@@ -220,12 +224,14 @@ def _simulate_with_process_noise(
             raise ValueError(
                 "process noise simulation requires evenly spaced years for midpoint/annual_mean"
             )
+        if observation_lag >= step:
+            raise ValueError("observation_lag must be less than the year step")
 
     n = t_eval.shape[0]
     prey_out = np.empty(n, dtype=float)
     predator_out = np.empty(n, dtype=float)
 
-    t = float(t_eval[0] + observation_lag)
+    t = float(t_eval[0])
     prey = float(x0[0])
     predator = float(x0[1])
 

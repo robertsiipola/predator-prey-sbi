@@ -1,1 +1,1 @@
-"""Predator-prey simulation-based inference utilities."""
+"""Predator-prey simulation-based inference package."""
