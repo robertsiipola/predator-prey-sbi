@@ -16,10 +16,12 @@ from predator_prey_sbi.npe import build_prior, build_simulator, train_posterior
 from predator_prey_sbi.parameters import (
     resolve_initial_conditions,
     resolve_lv_params,
+    resolve_observation_ar1,
     resolve_noise_scales,
     resolve_observation_lag,
     resolve_observation_power,
     resolve_observation_scales,
+    resolve_process_noise_correlation,
     resolve_process_noise_scale,
 )
 from predator_prey_sbi.priors import build_structure_aware_prior
@@ -112,9 +114,11 @@ def posterior_predictive(
         sim_x0 = resolve_initial_conditions(params, x0)
         sim_noise = resolve_noise_scales(params, noise_scale)
         sim_process_noise = resolve_process_noise_scale(params, process_noise_scale)
+        sim_process_noise_corr = resolve_process_noise_correlation(params, 0.0)
         sim_obs_scale = resolve_observation_scales(params)
         sim_obs_lag = resolve_observation_lag(params, 0.0)
         sim_obs_power = resolve_observation_power(params)
+        sim_obs_ar1 = resolve_observation_ar1(params, (0.0, 0.0))
         obs_ref: tuple[float, float] | None = None
         if sim_obs_power != (1.0, 1.0) and {"log_x_eq", "log_y_eq"}.issubset(params):
             obs_ref = (
@@ -128,6 +132,7 @@ def posterior_predictive(
             dt=dt,
             noise_scale=sim_noise,
             process_noise_scale=sim_process_noise,
+            process_noise_correlation=sim_process_noise_corr,
             rng_seed=int(noise_seed_rng.integers(0, 2**32 - 1)),
             observation_scale=sim_obs_scale,
             observation_power=sim_obs_power,
@@ -135,6 +140,7 @@ def posterior_predictive(
             observation_operator=observation_operator,
             observation_substeps=observation_substeps,
             observation_lag=sim_obs_lag,
+            observation_ar1=sim_obs_ar1,
         )
         hare_sims.append(hare_sim)
         lynx_sims.append(lynx_sim)
@@ -327,6 +333,7 @@ def latent_dynamics_diagnostic(
     for params in params_list:
         sim_x0 = resolve_initial_conditions(params, x0)
         sim_process_noise = resolve_process_noise_scale(params, process_noise_scale)
+        sim_process_noise_corr = resolve_process_noise_correlation(params, 0.0)
         sim_obs_lag = resolve_observation_lag(params, 0.0)
         hare_latent, lynx_latent = simulate_lv(
             years=years,
@@ -335,6 +342,7 @@ def latent_dynamics_diagnostic(
             dt=dt,
             noise_scale=0.0,
             process_noise_scale=sim_process_noise,
+            process_noise_correlation=sim_process_noise_corr,
             rng_seed=int(rng.integers(0, 2**32 - 1)),
             observation_scale=(1.0, 1.0),
             observation_power=(1.0, 1.0),
@@ -652,11 +660,18 @@ def diagnostics_from_file(
     prior_scheme = str(inference_cfg.get("prior_scheme", "default"))
     k_parameterization = str(inference_cfg.get("k_parameterization", "k_ratio"))
     include_process_noise = bool(inference_cfg.get("include_process_noise", False))
+    include_process_noise_correlation = bool(
+        inference_cfg.get("include_process_noise_correlation", False)
+    )
     include_holling = bool(inference_cfg.get("include_holling", False))
     include_observation_scale = bool(
         inference_cfg.get("include_observation_scale", False)
     )
+    include_observation_power = bool(
+        inference_cfg.get("include_observation_power", False)
+    )
     include_observation_lag = bool(inference_cfg.get("include_observation_lag", False))
+    include_observation_ar1 = bool(inference_cfg.get("include_observation_ar1", False))
     parameter_order = list(
         inference_cfg.get(
             "parameter_order",
@@ -701,9 +716,12 @@ def diagnostics_from_file(
             prior_cfg,
             k_parameterization=k_parameterization,
             include_process_noise=include_process_noise,
+            include_process_noise_correlation=include_process_noise_correlation,
             include_holling=include_holling,
             include_observation_scale=include_observation_scale,
+            include_observation_power=include_observation_power,
             include_observation_lag=include_observation_lag,
+            include_observation_ar1=include_observation_ar1,
         )
     simulator = build_simulator(
         years=years,

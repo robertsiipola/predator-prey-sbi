@@ -1,0 +1,9 @@
+extends: ./base_seq_4k.yaml
+
+inference:
+  include_process_noise_correlation: true
+  include_observation_ar1: true
+  prior:
+    rho_p: [-0.9, 0.9]
+    phi_h: [-0.95, 0.95]
+    phi_l: [-0.95, 0.95]

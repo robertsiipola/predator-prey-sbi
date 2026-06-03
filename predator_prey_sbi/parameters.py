@@ -135,6 +135,23 @@ def resolve_process_noise_scale(
     return float(default_scale)
 
 
+def resolve_process_noise_correlation(
+    values: Mapping[str, float],
+    default_correlation: float = 0.0,
+) -> float:
+    if "rho_p" in values:
+        rho = float(values["rho_p"])
+    elif "process_noise_correlation" in values:
+        rho = float(values["process_noise_correlation"])
+    else:
+        rho = float(default_correlation)
+    if not math.isfinite(rho):
+        raise ValueError("process noise correlation must be finite")
+    if abs(rho) >= 1.0:
+        raise ValueError("process noise correlation must be in (-1, 1)")
+    return rho
+
+
 def resolve_observation_scales(
     values: Mapping[str, float],
     default_scales: tuple[float, float] = (1.0, 1.0),
@@ -201,6 +218,27 @@ def resolve_observation_lag(
             raise ValueError("tau_obs must be non-negative")
         return lag
     return float(default_lag)
+
+
+def resolve_observation_ar1(
+    values: Mapping[str, float],
+    default_ar1: tuple[float, float] = (0.0, 0.0),
+) -> tuple[float, float]:
+    if "phi" in values:
+        phi = float(values["phi"])
+        phi_h = phi_l = phi
+    elif "phi_h" in values or "phi_l" in values:
+        if "phi_h" not in values or "phi_l" not in values:
+            raise ValueError("Both phi_h and phi_l are required")
+        phi_h = float(values["phi_h"])
+        phi_l = float(values["phi_l"])
+    else:
+        phi_h, phi_l = default_ar1
+    if not (math.isfinite(phi_h) and math.isfinite(phi_l)):
+        raise ValueError("phi_h/phi_l must be finite")
+    if abs(phi_h) >= 1.0 or abs(phi_l) >= 1.0:
+        raise ValueError("phi_h/phi_l must be in (-1, 1)")
+    return phi_h, phi_l
 
 
 def resolve_initial_conditions(

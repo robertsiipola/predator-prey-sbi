@@ -12,11 +12,18 @@ def build_structure_aware_prior(
     overrides: dict[str, Any] | None = None,
     k_parameterization: str = "k_ratio",
     include_process_noise: bool = False,
+    include_process_noise_correlation: bool = False,
     include_holling: bool = False,
     include_observation_scale: bool = False,
     include_observation_power: bool = False,
     include_observation_lag: bool = False,
+    include_observation_ar1: bool = False,
 ) -> tuple[list[str], dict[str, list[float]]]:
+    if include_process_noise_correlation and not include_process_noise:
+        raise ValueError(
+            "include_process_noise_correlation requires include_process_noise=True"
+        )
+
     hare_arr = np.asarray(hare_obs, dtype=float)
     lynx_arr = np.asarray(lynx_obs, dtype=float)
     if hare_arr.size == 0 or lynx_arr.size == 0:
@@ -84,6 +91,10 @@ def build_structure_aware_prior(
         defaults["log_sigma_p"] = log_range(1e-3, 0.12)
         insert_at = parameter_order.index("eps_h0")
         parameter_order.insert(insert_at, "log_sigma_p")
+        if include_process_noise_correlation:
+            defaults["rho_p"] = [-0.95, 0.95]
+            insert_at = parameter_order.index("eps_h0")
+            parameter_order.insert(insert_at, "rho_p")
 
     if include_holling:
         h_low = max(1e-4, 0.1 / hare_med)
@@ -110,6 +121,13 @@ def build_structure_aware_prior(
         defaults["obs_lag"] = [0.0, 1.0]
         insert_at = parameter_order.index("eps_h0")
         parameter_order.insert(insert_at, "obs_lag")
+
+    if include_observation_ar1:
+        defaults["phi_h"] = [-0.95, 0.95]
+        defaults["phi_l"] = [-0.95, 0.95]
+        insert_at = parameter_order.index("eps_h0")
+        parameter_order.insert(insert_at, "phi_l")
+        parameter_order.insert(insert_at, "phi_h")
 
     if overrides:
         for key, value in overrides.items():
