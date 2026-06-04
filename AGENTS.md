@@ -16,4 +16,6 @@ Dependency management is handled entirely by uv; do not use pip.
 
 # ExecPlans
  
-When writing complex features or significant refactors, use an ExecPlan (as described in PLANS.md) from design to implementation. Store the plans in the .agent/ folder.
+When writing complex features or significant refactors, use an ExecPlan (as described in docs/PLANS.md) from design to implementation.
+
+Store active plans in docs/exec-plans/active/ and completed plans in docs/exec-plans/completed/. Record experiment outcomes in docs/exec-plans/lab-journal.md and docs/exec-plans/lab-journal.tsv.

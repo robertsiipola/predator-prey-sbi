@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This repository includes `.agent/PLANS.md` from the repository root. This ExecPlan must be maintained in accordance with `.agent/PLANS.md`.
+This repository includes `docs/PLANS.md` from the repository root. This ExecPlan must be maintained in accordance with `docs/PLANS.md`.
 
 ## Purpose / Big Picture
 
@@ -12,7 +12,7 @@ After this change, a user can run a named experiment config, `configs/experiment
 
 ## Progress
 
-- [x] (2026-06-03 20:09Z) Created this focused ExecPlan after reading `.agent/PLANS.md` and confirming the existing code already supports observation scaling and explicit prior overrides.
+- [x] (2026-06-03 20:09Z) Created this focused ExecPlan after reading `docs/PLANS.md` and confirming the existing code already supports observation scaling and explicit prior overrides.
 - [x] (2026-06-03 20:09Z) Calculated relaxed equilibrium prior bounds from `data/LynxHare.txt`: hare median 40.97, lynx median 29.59, so 0.25x-to-4.0x log bounds are hare `[2.3265457304388892, 5.09913445267867]` and lynx `[2.0011421052922276, 4.773730827532009]`.
 - [x] (2026-06-03 20:11Z) Added `configs/experiments/base_seq_4k_relaxed_eq_obs_scale.yaml` and `tests/test_relaxed_eq_obs_scale_config.py`.
 - [x] (2026-06-03 20:11Z) Ran `ruff format`, `ruff check`, `ty check`, and `pytest`; all checks passed with 22 tests.
@@ -23,7 +23,7 @@ After this change, a user can run a named experiment config, `configs/experiment
 - Observation: No simulator or inference code change is required to start this experiment.
   Evidence: `predator_prey_sbi/priors.py` already accepts `include_observation_scale=True` and honors two-element prior overrides for `log_x_eq` and `log_y_eq`; `predator_prey_sbi/infer.py` and `predator_prey_sbi/diagnostics.py` pass those flags through when using the structure-aware prior scheme.
 - Observation: The widened-prior observation-scale benchmark did not improve hare RMSE versus the January sequential baseline, although it improved lynx RMSE slightly.
-  Evidence: `runs/2026-06-04_174331/diagnostics_metrics.json` reports hare RMSE 36.47 and lynx RMSE 19.05; `.agent/experiment_results.tsv` records the January `base_seq_4k.yaml` baseline at hare 35.56 and lynx 19.42.
+  Evidence: `runs/2026-06-04_174331/diagnostics_metrics.json` reports hare RMSE 36.47 and lynx RMSE 19.05; `docs/exec-plans/lab-journal.tsv` records the January `base_seq_4k.yaml` baseline at hare 35.56 and lynx 19.42.
 - Observation: The wider equilibrium/scaling combination increased latent phase coherence relative to the January latent diagnostic but produced substantially damped latent draws.
   Evidence: `runs/2026-06-04_174356/diagnostics_metrics.json` reports latent phase coherence ~0.30/0.20 and tau_damp p50 ~37.1y; terminal diagnostics reported latent damping ratios ~0.55/0.56.
 
@@ -99,13 +99,13 @@ Create the experiment config. The expected YAML is:
 
 Create or update tests so `UV_CACHE_DIR=.uv-cache PYTHONPATH=. uv run pytest -q` includes a test for this config and reports all tests passing.
 
-After benchmarking, append one row to `.agent/experiment_results.tsv` with the timestamp, config path, posterior path, diagnostics JSON path, hare RMSE, and lynx RMSE. Update `.agent/sbi-execplan.md` with the result because it is the main long-running SBI plan.
+After benchmarking, append one row to `docs/exec-plans/lab-journal.tsv` with the timestamp, config path, posterior path, diagnostics JSON path, hare RMSE, and lynx RMSE. Update `docs/exec-plans/active/sbi-execplan.md` with the result because it is the main long-running SBI plan.
 
 ## Validation and Acceptance
 
 The implementation milestone is accepted when the new config exists, the new test proves the relaxed priors and observation-scale parameters are active, and all quality checks pass.
 
-The experiment milestone is accepted because inference and diagnostics completed for `configs/experiments/base_seq_4k_relaxed_eq_obs_scale.yaml`. The key comparison is against the January baseline row in `.agent/experiment_results.tsv` for `configs/experiments/base_seq_4k.yaml`, which had hare RMSE about 35.56 and lynx RMSE about 19.42. The relaxed-equilibrium observation-scale run produced hare RMSE 36.47 and lynx RMSE 19.05, so it should not replace the baseline. Its phase coherence improved versus the January latent diagnostic, but latent damping remained a concern.
+The experiment milestone is accepted because inference and diagnostics completed for `configs/experiments/base_seq_4k_relaxed_eq_obs_scale.yaml`. The key comparison is against the January baseline row in `docs/exec-plans/lab-journal.tsv` for `configs/experiments/base_seq_4k.yaml`, which had hare RMSE about 35.56 and lynx RMSE about 19.42. The relaxed-equilibrium observation-scale run produced hare RMSE 36.47 and lynx RMSE 19.05, so it should not replace the baseline. Its phase coherence improved versus the January latent diagnostic, but latent damping remained a concern.
 
 ## Idempotence and Recovery
 

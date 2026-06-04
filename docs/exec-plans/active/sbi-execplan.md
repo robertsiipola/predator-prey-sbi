@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This repository includes .agent/PLANS.md from the repository root. This ExecPlan must be maintained in accordance with .agent/PLANS.md.
+This repository includes docs/PLANS.md from the repository root. This ExecPlan must be maintained in accordance with docs/PLANS.md.
 
 ## Purpose / Big Picture
 
@@ -31,7 +31,7 @@ The goal is to let a user infer predator-prey model parameters from the historic
 - [x] (2026-01-05 19:11Z) Ran inference + diagnostics with structure-aware priors; recorded RMSE and SBC results.
 - [x] (2026-01-05 19:23Z) Tightened structure-aware priors (T/r/x_eq/y_eq/k_ratio, eps, sigma) and reran inference + diagnostics; recorded RMSE and SBC results.
 - [x] (2026-01-05 19:29Z) Increased structure-aware simulation budget to 4k and reran inference + diagnostics; recorded RMSE and SBC results.
-- [x] (2026-01-09 17:31Z) Added annual-mean and midpoint observation operators, posterior predictive mean RMSE reporting, and a latent process-noise option (log_sigma_p); ran an experiment sweep and recorded results in .agent/experiment_results.tsv.
+- [x] (2026-01-09 17:31Z) Added annual-mean and midpoint observation operators, posterior predictive mean RMSE reporting, and a latent process-noise option (log_sigma_p); ran an experiment sweep and recorded results in docs/exec-plans/lab-journal.tsv.
 - [x] (2026-01-09 17:33Z) Added optional Holling type-II predation and discovered/fixed a bug where predator growth mistakenly used delta*(beta*predation) instead of delta*predation.
 - [x] (2026-01-09 18:05Z) Increased simulation budget to 4k for the current best-performing baseline and achieved hare RMSE ~35.6 (lynx ~19.8) on posterior predictive mean.
 - [ ] (2026-01-09 18:57Z) Next: scale up simulation budget sweep (completed: 6k/8k; remaining: 12k) for the current best config and record the RMSE vs. runtime curve.
@@ -83,11 +83,11 @@ The goal is to let a user infer predator-prey model parameters from the historic
 - Observation: Adding annual-mean observation operator and latent process noise provides small but consistent RMSE improvements; the best improvement in this round came from increasing the simulation budget to 4k.
   Evidence: runs/2026-01-09_180528/diagnostics_metrics.json reports posterior predictive mean RMSE hare=35.587, lynx=19.797 using configs/experiments/base_4k.yaml.
 - Observation: Adding per-species observation scaling parameters (log_c_h/log_c_l) did not improve RMSE under the current structure-aware priors (x_eq/y_eq anchored to data medians).
-  Evidence: .agent/experiment_results.tsv shows worse hare RMSE for configs/experiments/linear_obs_scale.yaml vs configs/base.yaml on 2026-01-09.
+  Evidence: docs/exec-plans/lab-journal.tsv shows worse hare RMSE for configs/experiments/linear_obs_scale.yaml vs configs/base.yaml on 2026-01-09.
 - Observation: Rejection sampling can become extremely slow when the learned posterior is narrow (very low acceptance), which can dominate experiment runtime.
   Evidence: sbi emitted a low acceptance warning during posterior sampling in a prior sweep (warning reported ~0.6% acceptance).
 - Observation: 2-round sequential SNPE (with a 20% prior mix-in) provided a small RMSE improvement at fixed budget, but MCMC posterior sampling was extremely slow and degraded RMSE in the tested sequential run.
-  Evidence: .agent/experiment_results.tsv shows hare RMSE ~35.56 for configs/experiments/base_seq_4k.yaml and ~37.22 for configs/experiments/base_seq_4k_mcmc.yaml on 2026-01-09.
+  Evidence: docs/exec-plans/lab-journal.tsv shows hare RMSE ~35.56 for configs/experiments/base_seq_4k.yaml and ~37.22 for configs/experiments/base_seq_4k_mcmc.yaml on 2026-01-09.
 - Observation: Under the current best sequential config, individual posterior draws keep oscillating but the pointwise mean flattens due to low phase coherence across draws.
   Evidence: runs/2026-01-10_073235/diagnostics_metrics.json reports latent_phase_coherence_hare≈0.18 and latent_phase_coherence_lynx≈0.16 with median latent_damping_ratio_hare≈1.08 and latent_damping_ratio_lynx≈1.05 (plot: runs/2026-01-10_073235/latent_posterior_draws.png).
 - Observation: The inferred damping timescale is often shorter than the full record length, even though per-draw oscillations can persist via process noise; ~90% of draws have tau_damp < record length in the diagnostic run.
@@ -329,10 +329,10 @@ Change Note: 2026-01-05 15:06Z — Added mechanistic regression summaries to the
 Change Note: 2026-01-05 15:13Z — Recorded mechanistic summary experiment results (RMSE and SBC).
 Change Note: 2026-01-05 15:47Z — Added learned embedding pathway and recorded the initial embedding experiment results.
 Change Note: 2026-01-05 19:11Z — Added structure-aware parameterization/priors and recorded the initial results.
-Change Note: 2026-01-09 17:31Z — Added observation operators (point/midpoint/annual_mean), latent process noise (log_sigma_p), tau_damp/k_ratio switch, and posterior predictive mean RMSE; ran a sweep and recorded results in .agent/experiment_results.tsv.
+Change Note: 2026-01-09 17:31Z — Added observation operators (point/midpoint/annual_mean), latent process noise (log_sigma_p), tau_damp/k_ratio switch, and posterior predictive mean RMSE; ran a sweep and recorded results in docs/exec-plans/lab-journal.tsv.
 Change Note: 2026-01-09 17:33Z — Added optional Holling type-II predation and fixed a Holling/linear predation bug in predator growth term.
 Change Note: 2026-01-09 18:05Z — Increased simulation budget experiments to 4k and recorded the improved RMSE for configs/experiments/base_4k.yaml.
-Change Note: 2026-01-09 23:40Z — Added optional 2-round sequential SNPE (with prior mix-in) and new experiment configs/scripts; recorded updated RMSE results in .agent/experiment_results.tsv.
+Change Note: 2026-01-09 23:40Z — Added optional 2-round sequential SNPE (with prior mix-in) and new experiment configs/scripts; recorded updated RMSE results in docs/exec-plans/lab-journal.tsv.
 Change Note: 2026-02-05 21:10Z — Added correlated process noise and AR(1) observation residual support (simulator/inference/diagnostics/priors/tests) to target persistent residual autocorrelation and phase decoherence.
 Change Note: 2026-06-03 19:59Z — Benchmarked configs/experiments/base_seq_4k_ar1_corr.yaml and recorded that it improves phase coherence but degrades hare RMSE and damping versus the January sequential baseline.
 Change Note: 2026-06-04 17:44Z — Added and benchmarked configs/experiments/base_seq_4k_relaxed_eq_obs_scale.yaml; recorded that relaxed equilibrium priors plus observation scaling do not improve hare RMSE versus the January sequential baseline.
