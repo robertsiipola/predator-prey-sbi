@@ -1,0 +1,9 @@
+# Experiment: 2-round SNPE with relaxed latent equilibrium priors and inferred observation scaling.
+
+extends: ./base_seq_4k.yaml
+
+inference:
+  include_observation_scale: true
+  prior:
+    log_x_eq: [2.3265457304388892, 5.09913445267867]
+    log_y_eq: [2.0011421052922276, 4.773730827532009]
