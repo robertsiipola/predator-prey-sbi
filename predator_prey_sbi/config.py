@@ -36,9 +36,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "prior_scheme": "structure_aware",
         "k_parameterization": "k_ratio",
         "include_process_noise": False,
+        "include_process_noise_correlation": False,
         "include_holling": False,
         "include_observation_scale": False,
+        "include_observation_power": False,
         "include_observation_lag": False,
+        "include_observation_ar1": False,
         "feature_mode": "embedding",
         "embedding": {
             "model": "nsf",

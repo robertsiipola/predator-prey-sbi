@@ -12,12 +12,14 @@ def simulate_lv(
     noise_scale: float | tuple[float, float],
     rng_seed: int | None,
     process_noise_scale: float = 0.0,
+    process_noise_correlation: float = 0.0,
     observation_scale: tuple[float, float] = (1.0, 1.0),
     observation_power: tuple[float, float] = (1.0, 1.0),
     observation_reference: tuple[float, float] | None = None,
     observation_operator: str = "point",
     observation_substeps: int = 10,
     observation_lag: float = 0.0,
+    observation_ar1: tuple[float, float] = (0.0, 0.0),
 ) -> tuple[list[float], list[float]]:
     """Simulate prey/predator series with Lotka-Volterra ODE and log-normal observation noise."""
     if dt <= 0:
@@ -32,6 +34,10 @@ def simulate_lv(
         raise ValueError("observation_lag must be non-negative")
     if process_noise_scale < 0:
         raise ValueError("process_noise_scale must be non-negative")
+    if not np.isfinite(process_noise_correlation):
+        raise ValueError("process_noise_correlation must be finite")
+    if abs(process_noise_correlation) >= 1.0:
+        raise ValueError("process_noise_correlation must be in (-1, 1)")
     if observation_scale[0] <= 0 or observation_scale[1] <= 0:
         raise ValueError("observation_scale values must be positive")
     if observation_power[0] <= 0 or observation_power[1] <= 0:
@@ -40,6 +46,10 @@ def simulate_lv(
         observation_reference[0] <= 0 or observation_reference[1] <= 0
     ):
         raise ValueError("observation_reference values must be positive")
+    if not (np.isfinite(observation_ar1[0]) and np.isfinite(observation_ar1[1])):
+        raise ValueError("observation_ar1 values must be finite")
+    if abs(observation_ar1[0]) >= 1.0 or abs(observation_ar1[1]) >= 1.0:
+        raise ValueError("observation_ar1 values must be in (-1, 1)")
 
     years_array = np.asarray(years, dtype=float)
     if not np.all(np.diff(years_array) > 0):
@@ -90,13 +100,22 @@ def simulate_lv(
             observation_operator=op,
             observation_substeps=observation_substeps,
             observation_lag=observation_lag,
+            process_noise_correlation=process_noise_correlation,
+        )
+        prey, predator = _apply_power_index(
+            prey,
+            predator,
+            observation_power=observation_power,
+            observation_reference=observation_reference,
         )
         prey = prey * float(observation_scale[0])
         predator = predator * float(observation_scale[1])
         noise = _normalize_noise_scale(noise_scale)
         if noise is not None:
-            prey = _apply_log_noise(prey, noise[0], rng)
-            predator = _apply_log_noise(predator, noise[1], rng)
+            prey = _apply_observation_noise(prey, noise[0], observation_ar1[0], rng)
+            predator = _apply_observation_noise(
+                predator, noise[1], observation_ar1[1], rng
+            )
         return prey.tolist(), predator.tolist()
 
     t_start = float(t_eval[0])
@@ -172,8 +191,8 @@ def simulate_lv(
     noise = _normalize_noise_scale(noise_scale)
     if noise is not None:
         rng = np.random.default_rng(rng_seed)
-        prey = _apply_log_noise(prey, noise[0], rng)
-        predator = _apply_log_noise(predator, noise[1], rng)
+        prey = _apply_observation_noise(prey, noise[0], observation_ar1[0], rng)
+        predator = _apply_observation_noise(predator, noise[1], observation_ar1[1], rng)
 
     return prey.tolist(), predator.tolist()
 
@@ -217,6 +236,7 @@ def _simulate_with_process_noise(
     observation_operator: str,
     observation_substeps: int,
     observation_lag: float,
+    process_noise_correlation: float,
 ) -> tuple[np.ndarray, np.ndarray]:
     diffs = np.diff(t_eval)
     if diffs.size == 0:
@@ -285,8 +305,13 @@ def _simulate_with_process_noise(
             dt_year = float(t_boundary - t)
             t, prey, predator = integrate(t, prey, predator, t_boundary)
             scale = process_noise_scale * float(np.sqrt(max(dt_year, 0.0)))
-            prey = max(prey, 1e-9) * float(np.exp(rng.normal(0.0, scale)))
-            predator = max(predator, 1e-9) * float(np.exp(rng.normal(0.0, scale)))
+            shock_h, shock_l = _draw_process_shocks(
+                scale=scale,
+                correlation=process_noise_correlation,
+                rng=rng,
+            )
+            prey = max(prey, 1e-9) * float(np.exp(shock_h))
+            predator = max(predator, 1e-9) * float(np.exp(shock_l))
         return prey_out, predator_out
 
     if op in {"midpoint", "mid_year", "midyear"}:
@@ -301,8 +326,13 @@ def _simulate_with_process_noise(
             boundary = float(t_eval[idx + 1] + observation_lag)
             t, prey, predator = integrate(t, prey, predator, boundary)
             scale = process_noise_scale * float(np.sqrt(max(step, 0.0)))
-            prey = max(prey, 1e-9) * float(np.exp(rng.normal(0.0, scale)))
-            predator = max(predator, 1e-9) * float(np.exp(rng.normal(0.0, scale)))
+            shock_h, shock_l = _draw_process_shocks(
+                scale=scale,
+                correlation=process_noise_correlation,
+                rng=rng,
+            )
+            prey = max(prey, 1e-9) * float(np.exp(shock_h))
+            predator = max(predator, 1e-9) * float(np.exp(shock_l))
         return prey_out, predator_out
 
     if op in {"annual_mean", "annual_average", "year_mean", "year_average"}:
@@ -329,8 +359,13 @@ def _simulate_with_process_noise(
             if idx == n - 1:
                 break
             scale = process_noise_scale * float(np.sqrt(max(step, 0.0)))
-            prey = max(prey, 1e-9) * float(np.exp(rng.normal(0.0, scale)))
-            predator = max(predator, 1e-9) * float(np.exp(rng.normal(0.0, scale)))
+            shock_h, shock_l = _draw_process_shocks(
+                scale=scale,
+                correlation=process_noise_correlation,
+                rng=rng,
+            )
+            prey = max(prey, 1e-9) * float(np.exp(shock_h))
+            predator = max(predator, 1e-9) * float(np.exp(shock_l))
         return prey_out, predator_out
 
     raise ValueError(
@@ -348,6 +383,43 @@ def _apply_log_noise(
     log_series = np.log(safe)
     noisy = log_series + rng.normal(0.0, noise_scale, size=log_series.shape)
     return np.exp(noisy)
+
+
+def _apply_observation_noise(
+    series: np.ndarray,
+    noise_scale: float,
+    ar1: float,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    if noise_scale == 0.0:
+        return np.asarray(series, dtype=float)
+    if ar1 == 0.0:
+        return _apply_log_noise(series, noise_scale, rng)
+    safe = np.clip(series, 1e-9, None)
+    log_series = np.log(safe)
+    eps = np.empty(log_series.shape, dtype=float)
+    init_sd = noise_scale / float(np.sqrt(max(1e-12, 1.0 - ar1**2)))
+    eps_prev = float(rng.normal(0.0, init_sd))
+    for idx in range(log_series.size):
+        innov = float(rng.normal(0.0, noise_scale))
+        eps_prev = ar1 * eps_prev + innov
+        eps[idx] = eps_prev
+    return np.exp(log_series + eps)
+
+
+def _draw_process_shocks(
+    *,
+    scale: float,
+    correlation: float,
+    rng: np.random.Generator,
+) -> tuple[float, float]:
+    if scale <= 0:
+        return 0.0, 0.0
+    if abs(correlation) < 1e-12:
+        return float(rng.normal(0.0, scale)), float(rng.normal(0.0, scale))
+    cov = np.array([[1.0, correlation], [correlation, 1.0]], dtype=float)
+    pair = rng.multivariate_normal(mean=np.zeros(2, dtype=float), cov=cov)
+    return float(pair[0] * scale), float(pair[1] * scale)
 
 
 def _normalize_noise_scale(

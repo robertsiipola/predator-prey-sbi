@@ -60,6 +60,9 @@ def infer_from_file(config_path: str, observed_path: str) -> str:
     prior_scheme = str(inference_cfg.get("prior_scheme", "default"))
     k_parameterization = str(inference_cfg.get("k_parameterization", "k_ratio"))
     include_process_noise = bool(inference_cfg.get("include_process_noise", False))
+    include_process_noise_correlation = bool(
+        inference_cfg.get("include_process_noise_correlation", False)
+    )
     include_holling = bool(inference_cfg.get("include_holling", False))
     include_observation_scale = bool(
         inference_cfg.get("include_observation_scale", False)
@@ -68,6 +71,7 @@ def infer_from_file(config_path: str, observed_path: str) -> str:
         inference_cfg.get("include_observation_power", False)
     )
     include_observation_lag = bool(inference_cfg.get("include_observation_lag", False))
+    include_observation_ar1 = bool(inference_cfg.get("include_observation_ar1", False))
     parameter_order = list(
         inference_cfg.get(
             "parameter_order",
@@ -112,10 +116,12 @@ def infer_from_file(config_path: str, observed_path: str) -> str:
             prior_cfg,
             k_parameterization=k_parameterization,
             include_process_noise=include_process_noise,
+            include_process_noise_correlation=include_process_noise_correlation,
             include_holling=include_holling,
             include_observation_scale=include_observation_scale,
             include_observation_power=include_observation_power,
             include_observation_lag=include_observation_lag,
+            include_observation_ar1=include_observation_ar1,
         )
 
     if feature_mode.lower() == "embedding":

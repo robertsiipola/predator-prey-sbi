@@ -10,10 +10,12 @@ from predator_prey_sbi.features import build_embedding_input, summarize_series
 from predator_prey_sbi.parameters import (
     resolve_initial_conditions,
     resolve_lv_params,
+    resolve_observation_ar1,
     resolve_noise_scales,
     resolve_observation_lag,
     resolve_observation_power,
     resolve_observation_scales,
+    resolve_process_noise_correlation,
     resolve_process_noise_scale,
 )
 from predator_prey_sbi.types import PosteriorLike
@@ -68,9 +70,11 @@ def build_simulator(
         sim_x0 = resolve_initial_conditions(values, x0)
         sim_noise = resolve_noise_scales(values, noise_scale)
         sim_process_noise = resolve_process_noise_scale(values, process_noise_scale)
+        sim_process_noise_corr = resolve_process_noise_correlation(values, 0.0)
         sim_obs_scale = resolve_observation_scales(values)
         sim_obs_power = resolve_observation_power(values)
         sim_obs_lag = resolve_observation_lag(values, 0.0)
+        sim_obs_ar1 = resolve_observation_ar1(values, (0.0, 0.0))
         obs_ref: tuple[float, float] | None = None
         if sim_obs_power != (1.0, 1.0) and {"log_x_eq", "log_y_eq"}.issubset(values):
             obs_ref = (
@@ -84,6 +88,7 @@ def build_simulator(
             dt=dt,
             noise_scale=sim_noise,
             process_noise_scale=sim_process_noise,
+            process_noise_correlation=sim_process_noise_corr,
             rng_seed=None,
             observation_scale=sim_obs_scale,
             observation_power=sim_obs_power,
@@ -91,6 +96,7 @@ def build_simulator(
             observation_operator=observation_operator,
             observation_substeps=observation_substeps,
             observation_lag=sim_obs_lag,
+            observation_ar1=sim_obs_ar1,
         )
         if mode == "embedding":
             features = build_embedding_input(

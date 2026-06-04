@@ -4,7 +4,12 @@ import math
 
 import pytest
 
-from predator_prey_sbi.parameters import resolve_lv_params, resolve_observation_lag
+from predator_prey_sbi.parameters import (
+    resolve_lv_params,
+    resolve_observation_ar1,
+    resolve_observation_lag,
+    resolve_process_noise_correlation,
+)
 
 
 def test_resolve_observation_lag_prefers_obs_lag() -> None:
@@ -59,3 +64,25 @@ def test_resolve_lv_params_k_ratio_must_exceed_one() -> None:
     }
     with pytest.raises(ValueError, match="k_ratio must be greater than 1"):
         resolve_lv_params(values)
+
+
+def test_resolve_process_noise_correlation_uses_rho_p() -> None:
+    assert resolve_process_noise_correlation(
+        {"rho_p": 0.4}, default_correlation=0.0
+    ) == pytest.approx(0.4)
+
+
+def test_resolve_process_noise_correlation_rejects_out_of_bounds() -> None:
+    with pytest.raises(ValueError, match="must be in \\(-1, 1\\)"):
+        resolve_process_noise_correlation({"rho_p": 1.0})
+
+
+def test_resolve_observation_ar1_shared_phi() -> None:
+    phi_h, phi_l = resolve_observation_ar1({"phi": 0.6})
+    assert phi_h == pytest.approx(0.6)
+    assert phi_l == pytest.approx(0.6)
+
+
+def test_resolve_observation_ar1_requires_both_species() -> None:
+    with pytest.raises(ValueError, match="Both phi_h and phi_l are required"):
+        resolve_observation_ar1({"phi_h": 0.2})

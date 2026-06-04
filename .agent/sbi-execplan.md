@@ -41,6 +41,8 @@ The goal is to let a user infer predator-prey model parameters from the historic
 - [x] (2026-01-10 07:33Z) Added a latent posterior-draw diagnostic (to separate damping vs phase decoherence) and discovered that mean-flattening is primarily phase decoherence: per-draw oscillations persist (median damping ratio ~1.05–1.08) but phase coherence is low (~0.16–0.18); also found config experiments were not inheriting from configs/base.yaml until adding an `extends:` mechanism.
 - [x] (2026-01-10 07:43Z) Implemented an inferred fractional observation lag (obs_lag in [0,1) years) and wired it through simulator/inference/diagnostics; first run did not materially change phase coherence or RMSE but provides the knob needed to test phase-alignment hypotheses.
 - [x] (2026-01-10 13:32Z) Prototyped an equilibrium-centered observation power index (p) (fur returns as a nonlinear index of abundance) and ran configs/experiments/obs_power.yaml; it produced posterior predictive RMSE hare 38.30 (lynx 19.21) and increased phase coherence (~0.32/0.27) but tended to reintroduce damping (tau_damp p50 ~34y).
+- [x] (2026-02-05 21:10Z) Added correlated process noise (rho_p) and log-scale AR(1) observation residuals (phi_h/phi_l) end-to-end across simulator, inference, diagnostics, priors, and tests; added configs/experiments/base_seq_4k_ar1_corr.yaml for targeted experiments.
+- [x] (2026-06-03 19:59Z) Ran a fresh configs/experiments/base_seq_4k_ar1_corr.yaml benchmark; hare RMSE worsened to 37.46 (lynx 19.36) versus the January sequential baseline, while latent phase coherence improved to ~0.39/0.33 but damping worsened (median damping ratio ~0.52/0.55, tau_damp p50 ~24.1y).
 - [ ] (2026-01-09 18:57Z) Next: revisit observation scaling (log_c_h/log_c_l) with relaxed equilibrium priors (widen log_x_eq/log_y_eq ranges), since the current equilibrium-anchored priors may make scaling redundant.
 
 ## Surprises & Discoveries
@@ -91,6 +93,8 @@ The goal is to let a user infer predator-prey model parameters from the historic
   Evidence: runs/2026-01-10_073235/diagnostics_metrics.json reports tau_damp_frac_lt_record≈0.895 with tau_damp_years_p50≈35.3 years.
 - Observation: Adding an inferred observation lag parameter did not substantially increase phase coherence in the first run; coherence remained low (~0.18) and RMSE stayed ~36.
   Evidence: runs/2026-01-10_074242/diagnostics_metrics.json reports latent_phase_coherence_hare≈0.19 and latent_phase_coherence_lynx≈0.18 with posterior_predictive_hare_rmse≈36.28 (config: configs/experiments/base_seq_4k_lag_latent_diag.yaml).
+- Observation: `uv` panicked on this machine during diagnostics invocations in this session, while `.venv/bin/python -m ...` worked reliably.
+  Evidence: panics from `system-configuration` (`Attempted to create a NULL object`) when running `uv run ...`; successful diagnostics and test commands via `.venv/bin/python`.
 
 ## Decision Log
 
@@ -151,12 +155,19 @@ The goal is to let a user infer predator-prey model parameters from the historic
 - Decision: Add an inferred fractional observation lag parameter (obs_lag) and apply it consistently across all observation operators (point/midpoint/annual_mean), including the process-noise path.
   Rationale: If annual sampling is systematically phase-shifted relative to the underlying ecological dynamics (or fur-return timing), a shared fractional lag is a minimal, testable way to improve alignment without changing the ecological model.
   Date/Author: 2026-01-10, Codex
+- Decision: Introduce correlated process shocks (`rho_p`) and per-species AR(1) log-observation residuals (`phi_h`, `phi_l`) as optional inferred parameters.
+  Rationale: Residual diagnostics showed strong lag-1 autocorrelation and naive lag-1 baselines beat current RMSE, indicating serially correlated structure that IID observation noise and independent process shocks could not represent.
+  Date/Author: 2026-02-05, Codex
 
 ## Outcomes & Retrospective
 
 Milestones 1–4 are implemented and verified with inference + diagnostics runs. Logistic prey growth (carrying capacity k) improved RMSE substantially versus the baseline. Adding inferred observation noise marginally improved lynx RMSE while keeping hare RMSE similar, while mechanistic regression summaries, the learned embedding, and the structure-aware priors (even after tightening) did not improve RMSE in the first trials; further gains likely need a larger simulation budget, alternative priors, or model/observation adjustments.
 
 As of 2026-01-09, the best observed hare RMSE in this round of experiments is ~35.6 (lynx ~19.4) using annual_mean observations, inferred latent process noise (log_sigma_p), and a 2-round sequential SNPE run with 4k total simulations (see configs/experiments/base_seq_4k.yaml). Additional structural extensions (Holling type-II) did not improve RMSE in the first sweep, and per-species observation scaling did not help under the current equilibrium-anchored priors.
+
+As of 2026-02-05, the codebase now supports two additional mechanisms targeted at residual structure: correlated process noise and AR(1) observation residuals. These are implemented and tested, with an experiment config prepared, but full RMSE benchmarking for this new parameterization is still pending.
+
+As of 2026-06-03, the first fresh correlated-process/AR(1)-observation benchmark does not justify prioritizing that parameterization for RMSE: it improves latent phase coherence but worsens hare RMSE and shortens the inferred damping timescale. The next modeling move should return to the January observation-scaling hypothesis with relaxed equilibrium priors, or constrain the AR(1) extension more tightly before spending larger simulation budgets.
 
 ## Context and Orientation
 
@@ -319,3 +330,5 @@ Change Note: 2026-01-09 17:31Z — Added observation operators (point/midpoint/a
 Change Note: 2026-01-09 17:33Z — Added optional Holling type-II predation and fixed a Holling/linear predation bug in predator growth term.
 Change Note: 2026-01-09 18:05Z — Increased simulation budget experiments to 4k and recorded the improved RMSE for configs/experiments/base_4k.yaml.
 Change Note: 2026-01-09 23:40Z — Added optional 2-round sequential SNPE (with prior mix-in) and new experiment configs/scripts; recorded updated RMSE results in .agent/experiment_results.tsv.
+Change Note: 2026-02-05 21:10Z — Added correlated process noise and AR(1) observation residual support (simulator/inference/diagnostics/priors/tests) to target persistent residual autocorrelation and phase decoherence.
+Change Note: 2026-06-03 19:59Z — Benchmarked configs/experiments/base_seq_4k_ar1_corr.yaml and recorded that it improves phase coherence but degrades hare RMSE and damping versus the January sequential baseline.
