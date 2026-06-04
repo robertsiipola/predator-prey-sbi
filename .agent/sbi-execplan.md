@@ -43,7 +43,8 @@ The goal is to let a user infer predator-prey model parameters from the historic
 - [x] (2026-01-10 13:32Z) Prototyped an equilibrium-centered observation power index (p) (fur returns as a nonlinear index of abundance) and ran configs/experiments/obs_power.yaml; it produced posterior predictive RMSE hare 38.30 (lynx 19.21) and increased phase coherence (~0.32/0.27) but tended to reintroduce damping (tau_damp p50 ~34y).
 - [x] (2026-02-05 21:10Z) Added correlated process noise (rho_p) and log-scale AR(1) observation residuals (phi_h/phi_l) end-to-end across simulator, inference, diagnostics, priors, and tests; added configs/experiments/base_seq_4k_ar1_corr.yaml for targeted experiments.
 - [x] (2026-06-03 19:59Z) Ran a fresh configs/experiments/base_seq_4k_ar1_corr.yaml benchmark; hare RMSE worsened to 37.46 (lynx 19.36) versus the January sequential baseline, while latent phase coherence improved to ~0.39/0.33 but damping worsened (median damping ratio ~0.52/0.55, tau_damp p50 ~24.1y).
-- [ ] (2026-01-09 18:57Z) Next: revisit observation scaling (log_c_h/log_c_l) with relaxed equilibrium priors (widen log_x_eq/log_y_eq ranges), since the current equilibrium-anchored priors may make scaling redundant.
+- [x] (2026-06-04 17:44Z) Revisited observation scaling with relaxed equilibrium priors using configs/experiments/base_seq_4k_relaxed_eq_obs_scale.yaml; the run produced posterior predictive RMSE hare 36.47 and lynx 19.05, with latent phase coherence ~0.30/0.20 and tau_damp p50 ~37.1y.
+- [ ] Next: decide whether to test a narrower relaxed-equilibrium range, combine observation scaling with stronger damping priors, or pivot to a different mechanism for residual autocorrelation.
 
 ## Surprises & Discoveries
 
@@ -168,6 +169,8 @@ As of 2026-01-09, the best observed hare RMSE in this round of experiments is ~3
 As of 2026-02-05, the codebase now supports two additional mechanisms targeted at residual structure: correlated process noise and AR(1) observation residuals. These are implemented and tested, with an experiment config prepared, but full RMSE benchmarking for this new parameterization is still pending.
 
 As of 2026-06-03, the first fresh correlated-process/AR(1)-observation benchmark does not justify prioritizing that parameterization for RMSE: it improves latent phase coherence but worsens hare RMSE and shortens the inferred damping timescale. The next modeling move should return to the January observation-scaling hypothesis with relaxed equilibrium priors, or constrain the AR(1) extension more tightly before spending larger simulation budgets.
+
+As of 2026-06-04, the relaxed-equilibrium observation-scale experiment has also been tested. It slightly improved lynx RMSE relative to the January sequential baseline but worsened hare RMSE and did not solve damping. This suggests observation scale alone is not the missing mechanism, although it remains a useful diagnostic knob for separating latent population scale from observed fur-return scale.
 
 ## Context and Orientation
 
@@ -332,3 +335,4 @@ Change Note: 2026-01-09 18:05Z — Increased simulation budget experiments to 4k
 Change Note: 2026-01-09 23:40Z — Added optional 2-round sequential SNPE (with prior mix-in) and new experiment configs/scripts; recorded updated RMSE results in .agent/experiment_results.tsv.
 Change Note: 2026-02-05 21:10Z — Added correlated process noise and AR(1) observation residual support (simulator/inference/diagnostics/priors/tests) to target persistent residual autocorrelation and phase decoherence.
 Change Note: 2026-06-03 19:59Z — Benchmarked configs/experiments/base_seq_4k_ar1_corr.yaml and recorded that it improves phase coherence but degrades hare RMSE and damping versus the January sequential baseline.
+Change Note: 2026-06-04 17:44Z — Added and benchmarked configs/experiments/base_seq_4k_relaxed_eq_obs_scale.yaml; recorded that relaxed equilibrium priors plus observation scaling do not improve hare RMSE versus the January sequential baseline.
